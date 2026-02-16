@@ -1,6 +1,6 @@
 #! /bin/bash
 # static variables (expect alphafold3 resources to be in directory as this file)
-export NTS_RESOURCES_DIR="/home/projects2/pbacu/repositories/aNetTCR-struc/nettcrstruc"
+export NTS_RESOURCES_DIR="/home/projects2/pbacu/repositories/NetTCR-struc/nettcrstruc"
 export NTS_SRC=${NTS_RESOURCES_DIR}
 export NTS_IMAGE=${NTS_RESOURCES_DIR}/image/nettcrstruct_python310_cuda117.sif
 
@@ -11,7 +11,9 @@ export NTS_ENSEMBLE_GVP_IF1=$3
 export NTS_ENSEMBLE_GVP=$4
 
 NTS_FEATURES_LOAD_GVP_IF1=$NTS_FEATURESSAVE/gvp_if1_embeddings
-NTS_FEATURES_LOAD_GVP=$NTS_FEATURESSAVE/gvp_embeddings
+NTS_FEATURES_LOAD_GVP=$NTS_FEATURESSAVE/gvp
+
+mkdir -p "$NTS_FEATURESSAVE"
 
 # print paths 
 echo NetTCRStruct resource: $NTS_RESOURCES_DIR
@@ -32,7 +34,7 @@ apptainer exec \
      python /mnt/nts_source/scripts/create_geometric_features.py \
      -i /mnt/nts_input \
      -o /mnt/nts_features \
-     -n 10 \
+     -n 4 \
      -d cuda \
      --chain_names D E C A
      
@@ -58,7 +60,7 @@ apptainer exec \
      --bind $NTS_FEATURES_LOAD_GVP:/mnt/nts_features_gvp \
      --bind $NTS_SRC:/mnt/nts_source \
      $NTS_IMAGE \
-     python /mnt/nts_source/scrips/rerank_docking_poses.py \
+     python /mnt/nts_source/scripts/rerank_docking_poses.py \
      input_dir=/mnt/nts_input \
      processed_dir=/mnt/nts_features_gvp \
      name=ensemble_gvp \

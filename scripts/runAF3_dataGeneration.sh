@@ -23,12 +23,11 @@ start_id=$7
 mkdir -p ${logs_path}
 GLOBAL_TASK_ID=$((${start_id} + ${SLURM_ARRAY_TASK_ID} - 1))
 sample=$(awk -v ArrayTaskID=$GLOBAL_TASK_ID '$1==ArrayTaskID {print $2}' $config)
-#sample=$(awk -v ArrayTaskID=$SLURM_ARRAY_TASK_ID '$1==ArrayTaskID {print $2}' $config)
 exec >"${logs_path}/${GLOBAL_TASK_ID}_${sample}_${uniprot_msa}_${template_selection_method}.out" 2>"${logs_path}/${GLOBAL_TASK_ID}_${sample}_${uniprot_msa}_${template_selection_method}.err"
 
 export input="${json_path}/${sample}"
 export output="${output_dir}"
 mkdir -p "$output"
 bash scripts/run_alphafold3_tcrpmhcdatabase.sh  "$input" "$output" TRUE FALSE "$uniprot_msa" "$template_selection_method" 
-    
+ 
 

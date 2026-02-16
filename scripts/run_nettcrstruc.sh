@@ -17,10 +17,12 @@ input_path=$1
 logs_path=$2
 ensemble=$3
 log_suffix=$4
-folders=$5
+folders_str=$5
 
-#read -r -a folders <<< "$folders_string"
-folder=${folders[$((${SLURM_ARRAY_TASK_ID}-1))]}
+mapfile -t folders <<< "$folders_str"
+folder="${folders[$SLURM_ARRAY_TASK_ID-1]}"
+
+mkdir -p $logs_path
 exec >"${logs_path}/${SLURM_ARRAY_TASK_ID}_${folder}_${log_suffix}.out" 2> "${logs_path}/${SLURM_ARRAY_TASK_ID}_${folder}_${log_suffix}.err"
 
 input_folder="${input_path}/${folder}" #It should be a directory containing directories. Each of the param_combs

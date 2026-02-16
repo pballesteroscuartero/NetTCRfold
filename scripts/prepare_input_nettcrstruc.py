@@ -15,6 +15,12 @@ def parse_args() -> argparse.Namespace:
         help="Path to the folder containing the param_comb folder with the different complexes ",
     )
     parser.add_argument(
+        "-n",
+        "--name",
+        required=True,
+        help="Folder name",
+    )
+    parser.add_argument(
         "-o",
         "--output",
         type=Path,
@@ -71,7 +77,7 @@ def main():
     args = parse_args()
     input_folder = Path(args.input)
     output_folder = Path(args.output)
-    folder_name = input_folder.name
+    folder_name = args.name
 
     structcrinput_dir = output_folder / folder_name
     structcrinput_dir.mkdir(parents=True, exist_ok=True)

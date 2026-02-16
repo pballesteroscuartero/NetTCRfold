@@ -20,10 +20,17 @@ def parse_args() -> argparse.Namespace:
         required=True,
         help="Path to the folder with af3 output containing confidence metrics",
     )
+    parser.add_argument(
+        "-s",
+        "--suffix",
+        type=Path,
+        required=True,
+        help="Suffix for the output_files",
+    )
     return parser.parse_args()
 
-def process_complex(c: Path):
-
+def process_complex(args):
+    c, suffix = args
     pdb_id = c.name
     ranking_scores = pd.read_csv(c / f"{pdb_id}_ranking_scores.csv")
 
@@ -43,7 +50,7 @@ def process_complex(c: Path):
         sample = int(name_split[1].split("-")[-1])
 
         af_confidence = ranking_lookup[(seed, sample)]
-        dockq_path = m / f"dockQ_metrics_{pdb_id}_{model_name}.json"
+        dockq_path = m / f"dockQ_metrics_{pdb_id}_{model_name}{suffix}.json"
 
         if dockq_path.exists():
             with open(dockq_path) as f:
@@ -90,23 +97,24 @@ def process_complex(c: Path):
             "dockq":dockq
         })
     df_pdb = pd.DataFrame(rows)
-    df_pdb.to_csv(c / "af3_extended_metrics.csv", index=False)
+    df_pdb.to_csv(c / f"af3_extended_metrics{suffix}.csv", index=False)
 
     return df_pdb
 
 def main():
     args = parse_args()
     input_path = args.input
+    suffix = args.suffix
 
     complexes = [c for c in input_path.iterdir() if c.is_dir()]
-
+    tasks = [(c, suffix) for c in complexes]
     dfs = []
     with ProcessPoolExecutor(max_workers=os.cpu_count()) as executor:
-        for df in executor.map(process_complex, complexes):
+        for df in executor.map(process_complex, tasks):
             dfs.append(df)
 
     df_metrics = pd.concat(dfs, ignore_index=True)
-    df_metrics.to_csv(input_path / "collected_af3metrics.csv", index=False)
+    df_metrics.to_csv(input_path / f"collected_af3metrics{suffix}.csv", index=False)
 
 if __name__ == "__main__":
     main()

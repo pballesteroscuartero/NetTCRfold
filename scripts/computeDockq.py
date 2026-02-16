@@ -58,7 +58,12 @@ def parse_args() -> argparse.Namespace:
         nargs='+',
         help="List of proteins for which to recompute the metrics, if not specified it will compute the metrics for all the complexes",
         )
-    
+    parser.add_argument(
+        "-s", 
+        "--suffix", 
+        help="Specify molecules used to compute dockq",
+        )
+
     return parser.parse_args()
 
 def cif_to_pdb(path_f, pdb_id, model_name):
@@ -106,11 +111,11 @@ def compute_dockq(predicted_path: Path,
         model_chain1 = " ".join(model_chain1)
     if not isinstance(model_chain2, str):
         model_chain2 = " ".join(model_chain2)
-    dockqPath="/home/projects2/sendel/repositories/DockQ/DockQ.py"
+    dockqPath="/mnt/dockq_repo/DockQ.py"
     cmd = f"python3 {dockqPath} {str(predicted_path)} {str(native_path)} -native_chain1 {native_chain1} -model_chain1 {model_chain1} -native_chain2 {native_chain2} -model_chain2 {model_chain2} -no_needle"
     return subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, encoding="utf-8")
 
-def parse_dockq_output(dockq_output: str, output_json_path:Path, pdb_id, model_name) -> dict:
+def parse_dockq_output(dockq_output: str, output_json_path:Path, pdb_id, model_name, suffix) -> dict:
     """Parses the output of DockQ.
 
     Args:
@@ -133,19 +138,19 @@ def parse_dockq_output(dockq_output: str, output_json_path:Path, pdb_id, model_n
         elif line.startswith("LRMS"):
             results["LRMS"] = float(line.split()[-1])
     
-    with open(f"{output_json_path}/dockQ_metrics_{pdb_id}_{model_name}.json", 'w') as f:
+    with open(f"{output_json_path}/dockQ_metrics_{pdb_id}_{model_name}{suffix}.json", 'w') as f:
         json.dump(results, f, indent=4)
 
     return results
 
 
-def dockq_one_complex(predicted_path, native_path, native_chain1, model_chain1, native_chain2, model_chain2, pdb_id, model_name):
+def dockq_one_complex(predicted_path, native_path, native_chain1, model_chain1, native_chain2, model_chain2, pdb_id, model_name, suffix):
     pdb_path = cif_to_pdb(predicted_path, pdb_id, model_name)
     result = compute_dockq(pdb_path, native_path, native_chain1, model_chain1, native_chain2, model_chain2)
-    output = parse_dockq_output(result.stdout, os.path.splitext(predicted_path)[0], pdb_id, model_name)
+    output = parse_dockq_output(result.stdout, os.path.splitext(predicted_path)[0], pdb_id, model_name, suffix)
 
 def process_complex(args):
-    c, args_ns = args
+    c, args_ns, suffix = args
     pdb_id = c.name
 
     template_path = args_ns.templates / f"{pdb_id}.trunc.fit.pdb"
@@ -161,6 +166,7 @@ def process_complex(args):
             native_chain2=args_ns.native_chain2,
             pdb_id=pdb_id,
             model_name=model_name,
+            suffix = suffix
         )
 
     return pdb_id
@@ -169,11 +175,11 @@ def main():
     args = parse_args()
     input_dir = Path(args.input)
     complexes = [f for f in input_dir.iterdir() if f.is_dir()]
-
+    suffix = args.suffix
     if args.recompute:
         complexes = [c for c in complexes if c.name in args.recompute]
 
-    tasks = [(c, args) for c in complexes]
+    tasks = [(c, args, suffix) for c in complexes]
 
     with ProcessPoolExecutor(max_workers=os.cpu_count()) as executor:
         executor.map(process_complex, tasks)

@@ -59,7 +59,7 @@ def get_mhc_sequence(
     """
 
     # grab the gene name
-    data_dir = Path("databases/mhc_sequences")
+    data_dir = Path("/mnt/mhc_sequences")
     gene = re.search(r"([A-Z])\*.*", allele).group(1)
     with open(data_dir / f"{gene}_prot.json") as f:
         data = json.load(f)
@@ -75,7 +75,7 @@ def get_mhc_sequence(
         raise KeyError(f"Allele {allele} not found in {data_dir}")
     return seq
 
-def json_af3(df, output, partition = None):
+def json_af3(df, output, partition = None, msa=True):
 
     if partition is not None:
         df = df[df.partition == partition]
@@ -107,14 +107,28 @@ def json_af3(df, output, partition = None):
 
                 proteins.append(protein)
             else: 
-                protein = {
-                    "protein": {
-                        "id": id_list[i],
-                        "sequence": seq_list[i]
+                if msa:
+                    protein = {
+                        "protein": {
+                            "id": id_list[i],
+                            "sequence": seq_list[i]
+                        }
                     }
-                }
-                
-                proteins.append(protein)
+                    
+                    proteins.append(protein)
+                    output_folder ="json_msa_template"
+                else:
+                    protein = {
+                        "protein": {
+                            "id": id_list[i],
+                            "sequence": seq_list[i],
+                            "unpairedMsa": "",
+                            "pairedMsa": ""
+                        }
+                    }
+                    
+                    proteins.append(protein)
+                    output_folder ="json_nomsa_template"
 
         jsonf["sequences"] = proteins
         jsonf["modelSeeds"] = [1]
@@ -122,7 +136,7 @@ def json_af3(df, output, partition = None):
         jsonf["version"] = 1
 
         
-        output_dir = output / "json_msa_template" / row["name"]
+        output_dir = output / output_folder / row["name"]
         output_dir.mkdir(parents=True, exist_ok=True)
         with open(output_dir / "alphafold_input.json", "w") as f:
             json.dump(jsonf, f, indent=4)
@@ -143,8 +157,9 @@ def main() -> None:
             {allele: get_mhc_sequence(allele) for allele in df["allele"].unique()}
         )
         df["MHCB_aa"] = ""
-    df.to_csv(Path(output_path/ f"{Path(input_csv).stem}_hla.csv"))
+    #df.to_csv(Path(output_path/ f"{Path(input_csv).stem}_hla.csv"))
     json_af3(df, Path(output_path / "jsonFiles/"), partition = args.partition)
+    json_af3(df, Path(output_path / "jsonFiles/"), partition = args.partition, msa=False)
 
 if __name__ == "__main__":
     main()

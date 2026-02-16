@@ -18,6 +18,7 @@ export NUM_DIFFUSION="${8:-5}"
 
 MSA_ARG=()
 TEMPLATE_ARG=()
+SEED_ARG=()
 if [ "$msamode" = "unpaired" ]; then
     MSA_ARG+=(--unpaired_with_uniprot)
 fi
@@ -26,8 +27,9 @@ if [ "$template_mode" = "onquery" ]; then
     TEMPLATE_ARG+=(--only_query_for_template)
 fi
 
-echo $MSA_ARG
-echo $TEMPLATE_ARG
+if [ "$NUM_SEEDS" -gt 1 ]; then
+    SEED_ARG+=(--num_seeds="$NUM_SEEDS")
+fi
 
 # print paths 
 echo AlphaFold3 resource: $AF3_RESOURCES_DIR
@@ -52,12 +54,10 @@ apptainer exec \
      --model_dir=/mnt/models \
      --db_dir=/mnt/tcrpmhc_databases \
      --output_dir=/mnt/af_output \
-     --num_seeds=$NUM_SEEDS \
-     --num_diffusion_samples=$NUM_DIFFUSION \
      --run_data_pipeline=$DATA_PIPELINE \
      --run_inference=$INFERENCE \
+     --num_diffusion_samples=$NUM_DIFFUSION \
+     --num_recycles=40 \
+     "${SEED_ARG[@]}" \
      "${TEMPLATE_ARG[@]}" \
-     "${MSA_ARG[@]}" \
-     
-
-
+     "${MSA_ARG[@]}"
