@@ -210,7 +210,7 @@ def process_protein(args):
     if not (mhc_file_A.exists() and mhc_file_B.exists() and mhc_file_C.exists() and tra_file_A.exists() and tra_file_B.exists() and tra_file_C.exists() and trb_file_A.exists() and trb_file_B.exists() and trb_file_C.exists()):
         return f"Skipped {protein_name}"
     
-    with open(mhc_file_A) as mhcA, open(mhc_file_B) as mhcB, open(mhc_file_C) as mhcC, open(tra_file_A) as traA, open(tra_file_B) as traB, open(tra_file_C) as traC, open(trb_file_C) as trbA, open(trb_file_B) as trbB, open(trb_file_C) as trbC:
+    with open(mhc_file_A) as mhcA, open(mhc_file_B) as mhcB, open(mhc_file_C) as mhcC, open(tra_file_A) as traA, open(tra_file_B) as traB, open(tra_file_C) as traC, open(trb_file_A) as trbA, open(trb_file_B) as trbB, open(trb_file_C) as trbC:
         mhcA = json.load(mhcA)
         mhcB = json.load(mhcB)
         mhcC = json.load(mhcC)  

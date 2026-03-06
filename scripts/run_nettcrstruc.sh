@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1
 #SBATCH --gres=shard:12
 #SBATCH --cpus-per-task=10
-#SBATCH --mem=15M
+#SBATCH --mem=20G
 #SBATCH --time=36:00:00
 #SBATCH --nodelist=compute02,compute03,compute04,compute05
 #SBATCH --output=/home/projects2/pbacu/projects/structureTCR/structurePipeline/logs/nettcrstruc/slurm_%A_%a.out

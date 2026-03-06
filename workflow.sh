@@ -16,11 +16,12 @@ set -Eeuo pipefail
 #source /home/projects2/pbacu/utils/Miniconda/etc/profile.d/conda.sh
 #conda activate structurePipeline
 
-#source configs/af3Benchmark_allfolders_2seeds_50diffusion.cfg
+source configs/af3Benchmark.cfg
 #source configs/schumacher.cfg
+#source configs/swapped_negatives.cfg
 #source configs/immrep2025.cfg
 #source configs/nettcr.cfg
-source configs/boltz2_benchmark.cfg
+#source configs/boltz2_benchmark.cfg
 
 
 src=/home/projects2/pbacu/projects/structureTCR/structurePipeline
@@ -28,18 +29,19 @@ mhcdb=$src/databases/mhc_sequences
 dockq_repo=/home/projects2/pbacu/repositories/DockQ
 #Define paths
 suffix_output_inference=$SUFFIX_OUTPUT
+suffix_output_datagen=$SUFFIX_DATAGEN
 
 output_base=$OUTPUT_DIR
 output_savedata="${output_base}/data/af3_output"
 input_basejson="${output_base}/data/jsonFiles"
-output_customjson="${input_basejson}/customJSON/"
-output_datageneration="${output_savedata}/small_db/dataPipelineOut/"
+output_customjson="${input_basejson}/customJSON${suffix_output_datagen}/"
+output_datageneration="${output_savedata}/small_db/dataPipelineOut${suffix_output_datagen}/"
 output_inference="${output_savedata}/small_db/structInference${suffix_output_inference}/"
 output_nettcrstruct_datareformatting="${output_base}/data/nettcrstruc${suffix_output_inference}"
 
 logs_path="${output_base}/logs" 
-logs_path_datageneration="${logs_path}/af3_datageneration_workflow/smalldb"      
-logs_path_inference="${logs_path}/af3_inference/smalldb"
+logs_path_datageneration="${logs_path}/af3_datageneration_workflow${suffix_output_datagen}/"      
+logs_path_inference="${logs_path}/af3_inference/"
 logs_path_nettcrstruct="${logs_path}/nettcrstruc"
 
 mkdir -p $output_customjson
@@ -82,8 +84,8 @@ if $RUN_DATA_GENERATION_PIPELINE; then
     #)  
 
     combinations=(
-    "paired standard"
-    "unpaired standard"
+    "paired onquery"
+    #"unpaired standard"
     #"unpaired onquery"
     )  
     
@@ -105,7 +107,7 @@ if $RUN_DATA_GENERATION_PIPELINE; then
             --array=1-${array_length}%${CONCURRENT} \
             scripts/runAF3_dataGeneration.sh \
             $ARRAY_MAP_DATA $input_basejson/"json_msa_template" $output_folder $logs_path_datageneration \
-            $uniprot_msa $template_selection_method $start)
+            $uniprot_msa $template_selection_method $start $IDENTITY_THRESHOLD)
 
             echo "Job $jobid finished."
         done
@@ -123,7 +125,7 @@ if $RUN_CUSTOM_JSON_GENERATION; then
     --bind "$INPUT_DB:/mnt/input_db" \
     --bind "$src:/mnt/source" \
     "$IMAGE" \
-    python /mnt/source/scripts/create_custom_json_reduced.py \
+    python /mnt/source/scripts/create_custom_json_onlyreconstruct.py \
         -i /mnt/input_data \
         -o /mnt/output_json \
         -d /mnt/input_db/"${INPUT_FILE%.csv}_hla_withid.csv"

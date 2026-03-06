@@ -19,6 +19,7 @@ logs_path=$4
 uniprot_msa=$5
 template_selection_method=$6
 start_id=$7
+identity_threshold=$8
 
 mkdir -p ${logs_path}
 GLOBAL_TASK_ID=$((${start_id} + ${SLURM_ARRAY_TASK_ID} - 1))
@@ -28,6 +29,6 @@ exec >"${logs_path}/${GLOBAL_TASK_ID}_${sample}_${uniprot_msa}_${template_select
 export input="${json_path}/${sample}"
 export output="${output_dir}"
 mkdir -p "$output"
-bash scripts/run_alphafold3_tcrpmhcdatabase.sh  "$input" "$output" TRUE FALSE "$uniprot_msa" "$template_selection_method" 
+bash scripts/run_alphafold3_tcrpmhcdatabase_tcrdiversity.sh  "$input" "$output" TRUE FALSE "$uniprot_msa" "$template_selection_method" "$identity_threshold"
  
 
