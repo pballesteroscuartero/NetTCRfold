@@ -104,6 +104,13 @@ _ONLY_QUERY_FOR_TEMPLATE = flags.DEFINE_bool(
     False,
     'Whether to only use query for template search. If False, the whole MSA is used.',
 )
+
+_IDENTITY_THRESHOLD = flags.DEFINE_float(
+    "identity_threshold_tcr_template_selection",
+    None,
+    "Identity threshold for TCR template selection. If None, uses AF3 default.",
+)
+
 # Binary paths.
 _JACKHMMER_BINARY_PATH = flags.DEFINE_string(
     'jackhmmer_binary_path',
@@ -792,6 +799,7 @@ def main(_):
         max_template_date=max_template_date,
         unpaired_with_uniprot=_UNPAIRED_WITH_UNIPROT.value,
         only_query_for_template=_ONLY_QUERY_FOR_TEMPLATE.value,
+        identity_threshold=_IDENTITY_THRESHOLD.value,
     )
   else:
     data_pipeline_config = None

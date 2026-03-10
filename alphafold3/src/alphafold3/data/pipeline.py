@@ -29,6 +29,8 @@ from alphafold3.data import templates as templates_lib
 @functools.cache
 def _get_protein_templates(
     sequence: str,
+    chain_id:str,
+    identity_threshold:float | None,
     input_msa_a3m: str,
     run_template_search: bool,
     templates_config: msa_config.TemplatesConfig,
@@ -49,6 +51,8 @@ def _get_protein_templates(
 
     protein_templates = templates_lib.Templates.from_seq_and_a3m(
         query_sequence=sequence,
+        query_chain_id=chain_id,
+        identity_threshold = identity_threshold,
         msa_a3m=input_msa_a3m,
         max_template_date=templates_config.filter_config.max_template_date,
         database_path=templates_config.template_tool_config.database_path,
@@ -79,6 +83,8 @@ def _get_protein_templates(
 @functools.cache
 def _get_protein_msa_and_templates(
     sequence: str,
+    chain_id: str,
+    identity_threshold:float | None,
     run_template_search: bool,
     uniref90_msa_config: msa_config.RunConfig,
     mgnify_msa_config: msa_config.RunConfig,
@@ -152,6 +158,8 @@ def _get_protein_msa_and_templates(
 
   protein_templates = _get_protein_templates(
       sequence=sequence,
+      chain_id = chain_id,
+      identity_threshold= identity_threshold,
       input_msa_a3m=unpaired_protein_msa.to_a3m(),
       run_template_search=run_template_search,
       templates_config=templates_config,
@@ -387,6 +395,7 @@ class DataPipelineConfig:
   max_template_date: datetime.date
   unpaired_with_uniprot: bool = False
   only_query_for_template: bool = False
+  identity_threshold: float | None = None
 
 
 class DataPipeline:
@@ -554,6 +563,7 @@ class DataPipeline:
     )
     self._pdb_database_path = data_pipeline_config.pdb_database_path
     self.with_uniprot_in_unpaired = data_pipeline_config.unpaired_with_uniprot
+    self.identity_threshold = data_pipeline_config.identity_threshold
     self.only_query_for_template = data_pipeline_config.only_query_for_template
     
 
@@ -592,6 +602,8 @@ class DataPipeline:
       # MSA None - search. Templates either [] - don't search, or None - search.
         unpaired_msa, paired_msa, template_hits = _get_protein_msa_and_templates(
             sequence=chain.sequence,
+            chain_id = chain.id,
+            identity_threshold = self.identity_threshold,
             run_template_search=not has_templates,  # Skip template search if [].
             uniref90_msa_config=self._uniref90_msa_config,
             mgnify_msa_config=self._mgnify_msa_config,
@@ -618,13 +630,17 @@ class DataPipeline:
       ).to_a3m()
       unpaired_msa = chain.unpaired_msa or empty_msa
       paired_msa = chain.paired_msa or empty_msa
+
       template_hits = _get_protein_templates(
           sequence=chain.sequence,
+          chain_id = chain.id,
+          identity_threshold= self.identity_threshold,
           input_msa_a3m=unpaired_msa,
           run_template_search=True,
           templates_config=self._templates_config,
           pdb_database_path=self._pdb_database_path,
       )
+
       templates = [
           folding_input.Template(
               mmcif=struc.to_mmcif(),

@@ -14,10 +14,10 @@ Instructions on how to install Alphafold3 as an executable package locally so we
 ### 1. Create a Conda Environment with Python 3.11
 
     # Create the environment
-    conda create -n Alphafold3 python=3.11
+    conda create -n af3_local python=3.11
 
     # Activate the environment
-    conda activate Alphafold3
+    conda activate af3_local
 
     # Prevent Python from using ~/.local for user-installed packages
     # This ensures the environment is fully isolated ("closed")
@@ -25,7 +25,7 @@ Instructions on how to install Alphafold3 as an executable package locally so we
 
     # Reactivate the environment for the change to take effect
     conda deactivate
-    conda activate Alphafold3
+    conda activate af3_local
 
 ### 2. Install Development Tools and Dependencies
 
