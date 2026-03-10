@@ -135,6 +135,7 @@ class WholePdbPipeline:
     max_template_date: datetime.date | None = None
     ref_max_modified_date: datetime.date | None = None
     max_templates: int = 4
+    #max_templates: int = 8
     filter_clashes: bool = False
     filter_crystal_aids: bool = False
     max_paired_sequence_per_species: int = 600
@@ -172,7 +173,6 @@ class WholePdbPipeline:
     logging_name = f'{fold_input.name}, random_seed={random_seed}'
     logging.info('processing %s', logging_name)
     struct = fold_input.to_structure(ccd=ccd)
-
     # Clean structure.
     cleaned_struc, cleaning_metadata = structure_cleaning.clean_structure(
         struct,
@@ -230,7 +230,6 @@ class WholePdbPipeline:
             drop_ligand_leaving_atoms=self._config.drop_ligand_leaving_atoms,
         )
     )
-
     # Select the tokens for Evoformer.
     # Each token (e.g. a residue) is encoded as one representative atom. This
     # is flexible enough to allow the 1-token-per-atom ligand representation
@@ -243,7 +242,7 @@ class WholePdbPipeline:
             flatten_non_standard_residues=self._config.flatten_non_standard_residues,
             logging_name=logging_name,
         )
-    )
+    )    
     total_tokens = len(all_tokens.atom_name)
     if (
         self._config.max_total_residues
@@ -347,7 +346,6 @@ class WholePdbPipeline:
         max_paired_sequence_per_species=self._config.max_paired_sequence_per_species,
         resolve_msa_overlaps=self._config.resolve_msa_overlaps,
     )
-
     # Create template features
     batch_templates = features.Templates.compute_features(
         all_tokens=all_tokens,
@@ -357,7 +355,6 @@ class WholePdbPipeline:
         max_templates=self._config.max_templates,
         logging_name=logging_name,
     )
-
     ref_max_modified_date = self._config.ref_max_modified_date
     conformer_max_iterations = self._config.conformer_max_iterations
     batch_ref_structure, ligand_ligand_bonds = (

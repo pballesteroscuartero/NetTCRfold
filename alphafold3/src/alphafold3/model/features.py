@@ -637,7 +637,7 @@ class MSA:
 
     # Pad:
     msa_size, num_tokens = padding_shapes.msa_size, padding_shapes.num_tokens
-
+    
     def safe_cast_int8(x):
       return np.clip(x, np.iinfo(np.int8).min, np.iinfo(np.int8).max).astype(
           np.int8
@@ -830,6 +830,8 @@ class Templates:
     for feature_name, v in np_example.items():
       np_example[feature_name] = v[:max_templates, standard_token_idxs, ...]
 
+    print(f"Template features shape: {np_example['template_aatype'].shape}")
+    
     # Pad along the token dimension.
     templates_features = Templates(
         aatype=_pad_to(

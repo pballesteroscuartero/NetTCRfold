@@ -380,6 +380,9 @@ def _filter_hits(
   """Filters hits based on the filter config."""
   filtered_hits = []
   seen_before = set()
+  #if query_chain_id in ("D", "E"):
+  #  max_hits = 8 
+
   print(f"Identity threshold for TCR chains set to {identity_treshold}")
   for hit in hits:
     if not hit.keep(
