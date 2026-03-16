@@ -375,7 +375,7 @@ def _filter_hits(
     deduplicate_sequences: bool,
     max_hits: int | None,
     query_chain_id:str,
-    identity_treshold: float | None,
+    identity_treshold: float,
 ) -> Sequence[Hit]:
   """Filters hits based on the filter config."""
   filtered_hits = []
@@ -385,7 +385,7 @@ def _filter_hits(
   #if query_chain_id in ("D", "E"):
   #  max_hits = 8 
 
-  if identity_treshold is not None and query_chain_id in ("D", "E"):
+  if identity_treshold!=1.1 and query_chain_id in ("D", "E"):
     print(f"Identity threshold for TCR chains set to {identity_treshold}")
 
   for hit in hits:
@@ -407,23 +407,22 @@ def _filter_hits(
         filtered_hits.append(hit)
         continue
     
-    if identity_treshold is not None:
-      if query_chain_id in ("D", "E"):
-          too_similar = False
-          for kept_hits in filtered_hits:
-            identity = _sequence_identity(
-              hit.output_templates_sequence,
-              kept_hits.output_templates_sequence
-            )
-            print(f"Hit has {identity} identity to previous hit")
-          
-            if identity >= identity_treshold:
-              too_similar = True
-              print(f"Reject hit because it had a {identity} to previous hits")
-              break
+    if query_chain_id in ("D", "E"):
+        too_similar = False
+        for kept_hits in filtered_hits:
+          identity = _sequence_identity(
+            hit.output_templates_sequence,
+            kept_hits.output_templates_sequence
+          )
+          print(f"Hit has {identity} identity to previous hit")
+        
+          if identity >= identity_treshold:
+            too_similar = True
+            print(f"Reject hit because it had a {identity} to previous hits")
+            break
 
-          if too_similar:
-            continue
+        if too_similar:
+          continue
 
     filtered_hits.append(hit)
     if max_hits and len(filtered_hits) == max_hits:
@@ -470,7 +469,7 @@ class Templates:
       *,
       query_sequence: str,
       query_chain_id:str,
-      identity_threshold:float | None,
+      identity_threshold:float,
       msa_a3m: str,
       max_template_date: datetime.date,
       database_path: os.PathLike[str] | str,
@@ -531,7 +530,7 @@ class Templates:
       *,
       query_sequence: str,
       query_chain_id:str,
-      identity_threshold:float | None,
+      identity_threshold:float,
       a3m: str,
       max_template_date: datetime.date,
       structure_store: structure_stores.StructureStore,

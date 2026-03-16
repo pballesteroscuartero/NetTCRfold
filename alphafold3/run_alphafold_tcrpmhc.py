@@ -107,7 +107,7 @@ _ONLY_QUERY_FOR_TEMPLATE = flags.DEFINE_bool(
 
 _IDENTITY_THRESHOLD = flags.DEFINE_float(
     "identity_threshold_tcr_template_selection",
-    None,
+    1.1,
     "Identity threshold for TCR template selection. If None, uses AF3 default.",
 )
 
@@ -723,7 +723,6 @@ def main(_):
     raise AssertionError(
         'Exactly one of --json_path or --input_dir must be specified.'
     )
-
 
   # Make sure we can create the output directory before running anything.
   try:

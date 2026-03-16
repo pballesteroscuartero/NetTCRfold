@@ -30,7 +30,7 @@ from alphafold3.data import templates as templates_lib
 def _get_protein_templates(
     sequence: str,
     chain_id:str,
-    identity_threshold:float | None,
+    identity_threshold:float,
     input_msa_a3m: str,
     run_template_search: bool,
     templates_config: msa_config.TemplatesConfig,
@@ -84,7 +84,7 @@ def _get_protein_templates(
 def _get_protein_msa_and_templates(
     sequence: str,
     chain_id: str,
-    identity_threshold:float | None,
+    identity_threshold:float,
     run_template_search: bool,
     uniref90_msa_config: msa_config.RunConfig,
     mgnify_msa_config: msa_config.RunConfig,
@@ -395,7 +395,7 @@ class DataPipelineConfig:
   max_template_date: datetime.date
   unpaired_with_uniprot: bool = False
   only_query_for_template: bool = False
-  identity_threshold: float | None = None
+  identity_threshold: float
 
 
 class DataPipeline:
