@@ -359,12 +359,18 @@ class Hit:
     return True
 
 def _sequence_identity(query: str, template: str) -> float:
-    assert len(query) == len(template)
-    matches = 0
-    for a, b in zip(query, template):
-        if a == b:
-            matches += 1
-    return matches / len(query)
+    aligned_positions = [(a, b) for a, b in zip(query, template) 
+                         if a != '-' and b != '-']
+    if not aligned_positions:
+        return 0.0
+    matches = sum(a == b for a, b in aligned_positions)
+    return matches / len(aligned_positions)
+    #assert len(query) == len(template)
+    #matches = 0
+    #for a, b in zip(query, template):
+    #    if a == b:
+    #        matches += 1
+    #return matches / len(query)
 
 def _filter_hits(
     hits: Iterable[Hit],

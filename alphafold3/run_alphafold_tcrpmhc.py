@@ -99,6 +99,12 @@ _UNPAIRED_WITH_UNIPROT = flags.DEFINE_bool(
     'Whether to include the Uniprot results also in the unpaired MSA for each chain.',
 )
 
+_UNPAIRED_MSA_ONLY = flags.DEFINE_bool(
+    'unpaired_msa_only',
+    False,
+    'Whether to only use the unpaired MSA for each chain.',
+)
+
 _ONLY_QUERY_FOR_TEMPLATE = flags.DEFINE_bool(
     'only_query_for_template',
     False,
@@ -191,7 +197,7 @@ _PDB_DATABASE_PATH = flags.DEFINE_string(
 )
 _SEQRES_DATABASE_PATH = flags.DEFINE_string(
     'seqres_database_path',
-    '${DB_DIR}/pdb_seqres_tcrpmhc_iedb_mhc_tcr_stcrdab.txt',
+    '${DB_DIR}/pdb_seqres_tcrpmhc_iedb_mhc_tcr_stcrdab_abTCR_onlyMHCbound.txt',
     'PDB sequence database path, used for template search.',
 )
 
@@ -797,6 +803,7 @@ def main(_):
         nhmmer_n_cpu=_NHMMER_N_CPU.value,
         max_template_date=max_template_date,
         unpaired_with_uniprot=_UNPAIRED_WITH_UNIPROT.value,
+        unpaired_msa_only=_UNPAIRED_MSA_ONLY.value,
         only_query_for_template=_ONLY_QUERY_FOR_TEMPLATE.value,
         identity_threshold=_IDENTITY_THRESHOLD.value,
     )
