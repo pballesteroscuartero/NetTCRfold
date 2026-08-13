@@ -21,12 +21,6 @@ def parse_args() -> argparse.Namespace:
         help="Path to the output file with the results",
     )
     parser.add_argument(
-        "-p",
-        "--partition",
-        type=int,
-        help="Partition for which we want to generate json files, in case we only want specific files",
-    )
-    parser.add_argument(
         "-m",
         "--mhc-db",
         type=Path,
@@ -166,8 +160,7 @@ def main() -> None:
     output_path = args.output
     output_path.mkdir(parents=True, exist_ok=True)
     df = pd.read_csv(input_csv)
-    if args.partition is not None:
-        df = df[df.partition == args.partition]
+   
     if "epitope_aa" in df.columns:
         df = df.rename(columns={"epitope_aa": "peptide"})
 
@@ -184,8 +177,10 @@ def main() -> None:
                     )
                 else:
                     df["name"] = df["peptide"] + "_" + df["TRA_aa"] + "_" + df["TRB_aa"]
+                    print("Unique identifier will be created using peptide, TRA_aa and TRB_aa columns.")
             else:
                 df["name"] = df["peptide"] + "_" + df["A1"] + "_" + df["A2"] + "_" + df["A3"] + "_" + df["B1"] + "_" + df["B2"] + "_" + df["B3"] 
+                print("Unique identifier will be created using peptide, A1, A2, A3, B1, B2 and B3 columns.")
     if "MHCA_aa" not in df.columns:
         df["MHCA_aa"] = df["allele"].map(
             {allele: get_mhc_sequence(allele, args.mhc_db) for allele in df["allele"].unique()}

@@ -5,8 +5,8 @@
 #SBATCH --cpus-per-task=5
 #SBATCH --mem=64G
 #SBATCH --time=250:00:00
-#SBATCH --output=/home/projects2/pbacu/projects/structureTCR/structurePipeline/logs/slurm_%A_%a.out
-#SBATCH --error=/home/projects2/pbacu/projects/structureTCR/structurePipeline/logs/slurm_%A_%a.err
+#SBATCH --output=/home/projects2/pbacu/projects/NetTCRfold/logs/slurm_%A_%a.out
+#SBATCH --error=/home/projects2/pbacu/projects/NetTCRfold/logs/slurm_%A_%a.err
 #--nodelist=compute02,compute03,compute04,compute05,compute06
 
 #Strict execution mode
@@ -16,22 +16,16 @@ set -Eeuo pipefail
 source /home/projects2/pbacu/utils/Miniconda/etc/profile.d/conda.sh
 conda activate structureTCR
 
-#source configs/af3Benchmark.cfg
-#source configs/benchmark_mhcI_withSwapped.cfg
-#source configs/schumacher.cfg
-#source configs/swapped_negatives.cfg
-source configs/immrep2025.cfg
-#source configs/nettcr.cfg
-#source configs/boltz2_benchmark.cfg
+source configs/config.cfg
 
 
-src=/home/projects2/pbacu/projects/structureTCR/structurePipeline
+src=/home/projects2/pbacu/projects/NetTCRfold
 mhcdb=$src/databases/mhc_sequences
 dockq_repo=/home/projects2/pbacu/repositories/DockQ
 
 #Metrics collection array-job sizing (override in config if needed)
-NUM_METRIC_SPLITS="${NUM_METRIC_SPLITS:-20}"
-CONCURRENT_METRICS="${CONCURRENT_METRICS:-20}"
+NUM_METRIC_SPLITS="${NUM_METRIC_SPLITS:-0}"
+CONCURRENT_METRICS="${CONCURRENT_METRICS:-0}"
 
 #Define paths
 suffix_output_inference=$SUFFIX_OUTPUT
@@ -65,19 +59,13 @@ exec >"/home/projects2/pbacu/projects/structureTCR/structurePipeline/logs/${name
 if $RUN_JSON_WITH_MSA_TEMPLATE_GENERATION; then
     echo "Performing data preprocessing step: Generating JSON for data generation step with MSA and Template"
 
-    cmd=(
-    python -m structureTCR.jsonPrep.dataPreprocessing_optimized
-    -i "$INPUT_DB/$INPUT_FILE"
-    -o "$output_base/data"
-    -m "$mhcdb"
-    )
-    if [[ -n "${PARTITION:-}" ]]; then
-        cmd+=(-p "$PARTITION")
-    fi
-
-    "${cmd[@]}"
+    python -m structureTCR.jsonPrep.dataPreprocessing_optimized \
+        -i "$INPUT_DB/$INPUT_FILE" \
+        -o "$output_base/data" \
+        -m "$mhcdb"
 
     echo "Data preprocessing finished"
+
 else
     echo "Skipping data preprocessing step"
 fi
