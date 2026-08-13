@@ -1,0 +1,4 @@
+*.sif
+__pycache__
+logs
+scripts/__pycache__/
