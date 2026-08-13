@@ -14,7 +14,7 @@ set -Eeuo pipefail
 
 #Usage example sbatch dataGenerationWorklow.sh + Write any change needed in config file
 source /home/projects2/pbacu/utils/Miniconda/etc/profile.d/conda.sh
-conda activate structurePipeline
+conda activate structureTCR
 
 #source configs/af3Benchmark.cfg
 #source configs/benchmark_mhcI_withSwapped.cfg
@@ -28,10 +28,6 @@ source configs/immrep2025.cfg
 src=/home/projects2/pbacu/projects/structureTCR/structurePipeline
 mhcdb=$src/databases/mhc_sequences
 dockq_repo=/home/projects2/pbacu/repositories/DockQ
-
-#structureTCR python package (src/structureTCR/...), used by all "python -m structureTCR...." calls below
-pkg_src=$src/src
-export PYTHONPATH="$pkg_src:${PYTHONPATH:-}"
 
 #Metrics collection array-job sizing (override in config if needed)
 NUM_METRIC_SPLITS="${NUM_METRIC_SPLITS:-20}"
@@ -71,21 +67,15 @@ if $RUN_JSON_WITH_MSA_TEMPLATE_GENERATION; then
 
     cmd=(
     python -m structureTCR.jsonPrep.dataPreprocessing_optimized
-    -i /mnt/input_db/$INPUT_FILE
-    -o /mnt/output/data
+    -i "$INPUT_DB/$INPUT_FILE"
+    -o "$output_base/data"
+    -m "$mhcdb"
     )
     if [[ -n "${PARTITION:-}" ]]; then
         cmd+=(-p "$PARTITION")
     fi
 
-    apptainer exec \
-        --bind "$INPUT_DB:/mnt/input_db" \
-        --bind "$output_base:/mnt/output" \
-        --bind "$src:/mnt/source" \
-        --bind "$mhcdb:/mnt/mhc_sequences" \
-        --env PYTHONPATH=/mnt/source/src \
-        "$IMAGE" \
-        "${cmd[@]}"
+    "${cmd[@]}"
 
     echo "Data preprocessing finished"
 else
@@ -134,17 +124,10 @@ fi
 
 if $RUN_CUSTOM_JSON_GENERATION; then
     echo "Generating custom JSON input files with different MSA and Template settings"
-    apptainer exec \
-    --bind "$output_datageneration:/mnt/input_data" \
-    --bind "$output_customjson:/mnt/output_json" \
-    --bind "$INPUT_DB:/mnt/input_db" \
-    --bind "$src:/mnt/source" \
-    --env PYTHONPATH=/mnt/source/src \
-    "$IMAGE" \
     python -m structureTCR.jsonPrep.create_custom_json_reconstruct \
-        -i /mnt/input_data \
-        -o /mnt/output_json \
-        -d /mnt/input_db/"${INPUT_FILE%.csv}_hla_withid.csv"
+        -i "$output_datageneration" \
+        -o "$output_customjson" \
+        -d "$INPUT_DB/${INPUT_FILE%.csv}_hla_withid.csv"
         
     echo "Custom JSON input generation finished. Files saved in $output_customjson"
 else
@@ -208,44 +191,15 @@ if $RUN_METRICS_COLLECTION; then
         for folder in $folders_metric_collection; do
             folder_path="$output_inference/$folder"
             echo "Computing Dockq for files in $folder"
-            if $COMPUTE_ON_PMHC; then
-                dockq_repo="/home/projects2/pbacu/repositories/DockQ"
-                apptainer exec \
-                    --bind "$folder_path:/mnt/input_folder" \
-                    --bind "$TEMPLATE_PATH:/mnt/template_path" \
-                    --bind "$src:/mnt/source" \
-                    --bind "$dockq_repo:/mnt/dockq_repo" \
-                    --env PYTHONPATH=/mnt/source/src \
-                    "$IMAGE" \
-                    python -m structureTCR.metrics.computeDockq \
-                        -i /mnt/input_folder \
-                        -t /mnt/template_path \
-                        -d /mnt/dockq_repo \
-                        -n1 D E \
-                        -m1 D E \
-                        -n2 C A \
-                        -m2 C A \
-                        -s "_dockQonpMHC"
-            fi
-            if $COMPUTE_ON_PEP; then
-                dockq_repo="/home/projects2/pbacu/repositories/DockQ"
-                apptainer exec \
-                    --bind "$folder_path:/mnt/input_folder" \
-                    --bind "$TEMPLATE_PATH:/mnt/template_path" \
-                    --bind "$src:/mnt/source" \
-                    --bind "$dockq_repo:/mnt/dockq_repo" \
-                    --env PYTHONPATH=/mnt/source/src \
-                    "$IMAGE" \
-                    python -m structureTCR.metrics.computeDockq \
-                        -i /mnt/input_folder \
-                        -t /mnt/template_path \
-                        -d /mnt/dockq_repo \
-                        -n1 D E \
-                        -m1 D E \
-                        -n2 C \
-                        -m2 C \
-                        -s "_dockQonpeptide"
-            fi
+            python -m structureTCR.metrics.computeDockq \
+                -i "$folder_path" \
+                -t "$TEMPLATE_PATH" \
+                -d "$dockq_repo" \
+                -n1 D E \
+                -m1 D E \
+                -n2 C A \
+                -m2 C A \
+                -s "_dockQonpMHC"
             echo "Computation for $folder finished."
             echo "Removing extra pdb files generated"
             find "$folder_path" -mindepth 3 -maxdepth 3 -type f -name "*.pdb" -delete
@@ -255,14 +209,9 @@ if $RUN_METRICS_COLLECTION; then
 
     echo "Collecting all metrics for AF3 generated structures and combining them in one file"
 
-    suffixes=()
-    if $COMPUTE_ON_PMHC; then
-        suffixes+=("_dockQonpMHC") 
-    fi
-    if $COMPUTE_ON_PEP; then
-        suffixes+=("_dockQonpeptide")  
-    fi
-    if [ ${#suffixes[@]} -eq 0 ]; then
+    if $COMPUTE_DOCKQ; then
+        suffixes=("_dockQonpMHC")
+    else
         suffixes=("")
         echo "DockQ will not be collected, only AF3 metrics will be collected and combined"
     fi
@@ -279,7 +228,7 @@ if $RUN_METRICS_COLLECTION; then
             jobid=$(sbatch --parsable --wait \
                 --array=0-$((NUM_METRIC_SPLITS - 1))%${CONCURRENT_METRICS} \
                 src/structureTCR/collect_metrics_slurm_parallel.sh \
-                "$folder_path" "$suffix" "$NUM_METRIC_SPLITS" "$metrics_logs" "$pkg_src")
+                "$folder_path" "$suffix" "$NUM_METRIC_SPLITS" "$metrics_logs")
             echo "Job $jobid for metrics collection ($folder, suffix=$suffix) finished."
 
             echo "Merging split metrics for $folder (suffix=$suffix)"

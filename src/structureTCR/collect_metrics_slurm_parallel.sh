@@ -9,20 +9,18 @@
 #Strict execution mode
 set -Eeuo pipefail
 
-#Usage: sbatch --array=0-<num_splits-1>%<concurrency> collect_metrics_slurm_parallel.sh <folder_path> <suffix> <num_splits> <logs_path> <pkg_src>
+#Usage: sbatch --array=0-<num_splits-1>%<concurrency> collect_metrics_slurm_parallel.sh <folder_path> <suffix> <num_splits> <logs_path>
 source /home/projects2/pbacu/utils/Miniconda/etc/profile.d/conda.sh
-conda activate structurePipeline
+conda activate structureTCR
 
 folder_path=$1
 suffix=$2
 num_splits=$3
 logs_path=$4
-pkg_src=$5
 
 mkdir -p "$logs_path"
 exec >"${logs_path}/split${SLURM_ARRAY_TASK_ID}.out" 2>"${logs_path}/split${SLURM_ARRAY_TASK_ID}.err"
 
-export PYTHONPATH="$pkg_src"
 python -m structureTCR.metrics.collect_af3metrics_extended_parallel \
     -i "$folder_path" \
     -s "$suffix" \

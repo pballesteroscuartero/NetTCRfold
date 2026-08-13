@@ -26,6 +26,13 @@ def parse_args() -> argparse.Namespace:
         type=int,
         help="Partition for which we want to generate json files, in case we only want specific files",
     )
+    parser.add_argument(
+        "-m",
+        "--mhc-db",
+        type=Path,
+        required=True,
+        help="Path to the folder with MHC sequence JSON files (databases/mhc_sequences)",
+    )
     return parser.parse_args()
 
 
@@ -63,18 +70,19 @@ def chainid_to_array(df, output_path):
 
 def get_mhc_sequence(
     allele: str,
+    data_dir: Path,
 ) -> str:
     """Returns the amino acid sequence of an MHC allele.
 
     Args:
         allele: MHC allele name.
+        data_dir: Path to the folder with MHC sequence JSON files.
 
     Returns:
         Amino acid sequence of the MHC allele.
     """
 
     # grab the gene name
-    data_dir = Path("/mnt/mhc_sequences")
     gene = re.search(r"([A-Z])\*.*", allele).group(1)
     with open(data_dir / f"{gene}_prot.json") as f:
         data = json.load(f)
@@ -180,7 +188,7 @@ def main() -> None:
                 df["name"] = df["peptide"] + "_" + df["A1"] + "_" + df["A2"] + "_" + df["A3"] + "_" + df["B1"] + "_" + df["B2"] + "_" + df["B3"] 
     if "MHCA_aa" not in df.columns:
         df["MHCA_aa"] = df["allele"].map(
-            {allele: get_mhc_sequence(allele) for allele in df["allele"].unique()}
+            {allele: get_mhc_sequence(allele, args.mhc_db) for allele in df["allele"].unique()}
         )
 
 
