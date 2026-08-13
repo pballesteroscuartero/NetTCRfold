@@ -2,3 +2,4 @@
 __pycache__
 logs
 scripts/__pycache__/
+scripts/__pycache__/*

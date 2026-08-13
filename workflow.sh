@@ -2,24 +2,25 @@
 #SBATCH --job-name=runAF3_fullworkflow
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=20
-#SBATCH --mem=500MB
-#SBATCH --time=96:00:00
-#SBATCH --nodelist=compute02,compute03,compute04,compute05
+#SBATCH --cpus-per-task=5
+#SBATCH --mem=64G
+#SBATCH --time=250:00:00
 #SBATCH --output=/home/projects2/pbacu/projects/structureTCR/structurePipeline/logs/slurm_%A_%a.out
 #SBATCH --error=/home/projects2/pbacu/projects/structureTCR/structurePipeline/logs/slurm_%A_%a.err
+#--nodelist=compute02,compute03,compute04,compute05,compute06
 
 #Strict execution mode
 set -Eeuo pipefail
 
 #Usage example sbatch dataGenerationWorklow.sh + Write any change needed in config file
-#source /home/projects2/pbacu/utils/Miniconda/etc/profile.d/conda.sh
-#conda activate structurePipeline
+source /home/projects2/pbacu/utils/Miniconda/etc/profile.d/conda.sh
+conda activate structurePipeline
 
-source configs/af3Benchmark.cfg
+#source configs/af3Benchmark.cfg
+#source configs/benchmark_mhcI_withSwapped.cfg
 #source configs/schumacher.cfg
 #source configs/swapped_negatives.cfg
-#source configs/immrep2025.cfg
+source configs/immrep2025.cfg
 #source configs/nettcr.cfg
 #source configs/boltz2_benchmark.cfg
 
@@ -27,11 +28,22 @@ source configs/af3Benchmark.cfg
 src=/home/projects2/pbacu/projects/structureTCR/structurePipeline
 mhcdb=$src/databases/mhc_sequences
 dockq_repo=/home/projects2/pbacu/repositories/DockQ
+
+#structureTCR python package (src/structureTCR/...), used by all "python -m structureTCR...." calls below
+pkg_src=$src/src
+export PYTHONPATH="$pkg_src:${PYTHONPATH:-}"
+
+#Metrics collection array-job sizing (override in config if needed)
+NUM_METRIC_SPLITS="${NUM_METRIC_SPLITS:-20}"
+CONCURRENT_METRICS="${CONCURRENT_METRICS:-20}"
+
 #Define paths
 suffix_output_inference=$SUFFIX_OUTPUT
 suffix_output_datagen=$SUFFIX_DATAGEN
 
 output_base=$OUTPUT_DIR
+
+#dbComparison/newResults/
 output_savedata="${output_base}/data/af3_output"
 input_basejson="${output_base}/data/jsonFiles"
 output_customjson="${input_basejson}/customJSON${suffix_output_datagen}/"
@@ -39,9 +51,11 @@ output_datageneration="${output_savedata}/small_db/dataPipelineOut${suffix_outpu
 output_inference="${output_savedata}/small_db/structInference${suffix_output_inference}/"
 output_nettcrstruct_datareformatting="${output_base}/data/nettcrstruc${suffix_output_inference}"
 
-logs_path="${output_base}/logs" 
+
+#dbComparison/newLogs/
+logs_path="${output_base}/logs/" 
 logs_path_datageneration="${logs_path}/af3_datageneration_workflow${suffix_output_datagen}/"      
-logs_path_inference="${logs_path}/af3_inference/"
+logs_path_inference="${logs_path}/af3_inference${suffix_output_inference}/"
 logs_path_nettcrstruct="${logs_path}/nettcrstruc"
 
 mkdir -p $output_customjson
@@ -56,7 +70,7 @@ if $RUN_JSON_WITH_MSA_TEMPLATE_GENERATION; then
     echo "Performing data preprocessing step: Generating JSON for data generation step with MSA and Template"
 
     cmd=(
-    python /mnt/source/scripts/dataPreprocessing_optimized.py
+    python -m structureTCR.jsonPrep.dataPreprocessing_optimized
     -i /mnt/input_db/$INPUT_FILE
     -o /mnt/output/data
     )
@@ -69,6 +83,7 @@ if $RUN_JSON_WITH_MSA_TEMPLATE_GENERATION; then
         --bind "$output_base:/mnt/output" \
         --bind "$src:/mnt/source" \
         --bind "$mhcdb:/mnt/mhc_sequences" \
+        --env PYTHONPATH=/mnt/source/src \
         "$IMAGE" \
         "${cmd[@]}"
 
@@ -85,8 +100,8 @@ if $RUN_DATA_GENERATION_PIPELINE; then
 
     combinations=(
     "paired onquery"
+    #"paired standard"
     #"unpaired standard"
-    #"unpaired onquery"
     )  
     
     for combo in "${combinations[@]}"; do
@@ -105,9 +120,9 @@ if $RUN_DATA_GENERATION_PIPELINE; then
 
             jobid=$(sbatch --parsable --wait \
             --array=1-${array_length}%${CONCURRENT} \
-            scripts/runAF3_dataGeneration.sh \
+            src/structureTCR/runAF3_dataGeneration.sh \
             $ARRAY_MAP_DATA $input_basejson/"json_msa_template" $output_folder $logs_path_datageneration \
-            $uniprot_msa $template_selection_method $start $IDENTITY_THRESHOLD)
+            $uniprot_msa $template_selection_method $start $IDENTITY_THRESHOLD) 
 
             echo "Job $jobid finished."
         done
@@ -124,11 +139,13 @@ if $RUN_CUSTOM_JSON_GENERATION; then
     --bind "$output_customjson:/mnt/output_json" \
     --bind "$INPUT_DB:/mnt/input_db" \
     --bind "$src:/mnt/source" \
+    --env PYTHONPATH=/mnt/source/src \
     "$IMAGE" \
-    python /mnt/source/scripts/create_custom_json_onlyreconstruct.py \
+    python -m structureTCR.jsonPrep.create_custom_json_reconstruct \
         -i /mnt/input_data \
         -o /mnt/output_json \
         -d /mnt/input_db/"${INPUT_FILE%.csv}_hla_withid.csv"
+        
     echo "Custom JSON input generation finished. Files saved in $output_customjson"
 else
     echo "Skipping custom JSON input generation"
@@ -159,7 +176,7 @@ if $RUN_AF3_INFERENCE; then
 
             jobid=$(sbatch --parsable --wait \
             --array=1-${array_length}%${CONCURRENT_INFERENCE} \
-            scripts/runAF3inference.sh \
+            src/structureTCR/runAF3inference.sh \
             "$folder_path" "$output_inference" "$logs_path_inference" \
             "$ARRAY_MAP_INFERENCE" "$NUM_SEEDS" "$NUM_DIFFUSION" "$start")
 
@@ -185,37 +202,44 @@ if $RUN_METRICS_COLLECTION; then
         folders_metric_collection=$FOLDERS_METRIC_COLLECTION
         echo "Using folders from config. Folders to process: $folders_metric_collection"
     fi
+
     if $COMPUTE_DOCKQ; then
         echo "Computing DockQ scores"
         for folder in $folders_metric_collection; do
             folder_path="$output_inference/$folder"
             echo "Computing Dockq for files in $folder"
             if $COMPUTE_ON_PMHC; then
+                dockq_repo="/home/projects2/pbacu/repositories/DockQ"
                 apptainer exec \
                     --bind "$folder_path:/mnt/input_folder" \
                     --bind "$TEMPLATE_PATH:/mnt/template_path" \
                     --bind "$src:/mnt/source" \
                     --bind "$dockq_repo:/mnt/dockq_repo" \
+                    --env PYTHONPATH=/mnt/source/src \
                     "$IMAGE" \
-                    python /mnt/source/scripts/computeDockq.py \
+                    python -m structureTCR.metrics.computeDockq \
                         -i /mnt/input_folder \
                         -t /mnt/template_path \
+                        -d /mnt/dockq_repo \
                         -n1 D E \
                         -m1 D E \
                         -n2 C A \
                         -m2 C A \
-                        -s "_dockQonpMHC"   
+                        -s "_dockQonpMHC"
             fi
             if $COMPUTE_ON_PEP; then
+                dockq_repo="/home/projects2/pbacu/repositories/DockQ"
                 apptainer exec \
                     --bind "$folder_path:/mnt/input_folder" \
                     --bind "$TEMPLATE_PATH:/mnt/template_path" \
                     --bind "$src:/mnt/source" \
                     --bind "$dockq_repo:/mnt/dockq_repo" \
+                    --env PYTHONPATH=/mnt/source/src \
                     "$IMAGE" \
-                    python /mnt/source/scripts/computeDockq.py \
+                    python -m structureTCR.metrics.computeDockq \
                         -i /mnt/input_folder \
                         -t /mnt/template_path \
+                        -d /mnt/dockq_repo \
                         -n1 D E \
                         -m1 D E \
                         -n2 C \
@@ -248,13 +272,20 @@ if $RUN_METRICS_COLLECTION; then
         echo "Collecting metrics for files in $folder"
         for i in "${!suffixes[@]}"; do
             suffix="${suffixes[$i]}"
-        
-            apptainer exec \
-            --bind "$folder_path:/mnt/input_folder" \
-            --bind "$src:/mnt/source" \
-            "$IMAGE" \
-            python /mnt/source/scripts/collect_af3metrics_extended.py \
-                -i /mnt/input_folder \
+            metrics_logs="${logs_path}/af3_metrics${suffix_output_inference}/${folder}${suffix}"
+            mkdir -p "$metrics_logs"
+
+            echo "Submitting metrics collection array job for $folder (suffix=$suffix): $NUM_METRIC_SPLITS splits, %${CONCURRENT_METRICS} concurrent"
+            jobid=$(sbatch --parsable --wait \
+                --array=0-$((NUM_METRIC_SPLITS - 1))%${CONCURRENT_METRICS} \
+                src/structureTCR/collect_metrics_slurm_parallel.sh \
+                "$folder_path" "$suffix" "$NUM_METRIC_SPLITS" "$metrics_logs" "$pkg_src")
+            echo "Job $jobid for metrics collection ($folder, suffix=$suffix) finished."
+
+            echo "Merging split metrics for $folder (suffix=$suffix)"
+            python -m structureTCR.metrics.mergeMetrics \
+                -i "$folder_path" \
+                -n "$NUM_METRIC_SPLITS" \
                 -s "$suffix"
         done
         echo "Computation for $folder finished."
@@ -262,13 +293,9 @@ if $RUN_METRICS_COLLECTION; then
 
     for i in "${!suffixes[@]}"; do
         suffix="${suffixes[$i]}"
-        apptainer exec \
-                --bind "$output_inference:/mnt/output_inference" \
-                --bind "$src:/mnt/source" \
-                "$IMAGE" \
-                python /mnt/source/scripts/combine_metrics_onefile.py \
-                    -i /mnt/output_inference \
-                    -s "$suffix"
+        python -m structureTCR.metrics.combine_metrics_onefile \
+            -i "$output_inference" \
+            -s "$suffix"
     done
 
 else
@@ -277,9 +304,7 @@ else
     
 fi
 
-
-if $COMPUTE_NETTCRSTRUC; then
-    echo "Computing reranking with nettcrstruct"
+if $PREPARE_NETTCRSTRUCT_INPUT; then
 
     if [[ -z "${FOLDERS_NETTCRSTRUC:-}" ]]; then
         echo "FOLDERS not provided in config — processing all subfolders in $output_inference"
@@ -299,47 +324,54 @@ if $COMPUTE_NETTCRSTRUC; then
         echo "Using folders from config. Folders to process: $folders_nettcrstruc_str"
     fi
 
-    if $PREPARE_NETTCRSTRUCT_INPUT; then
-        for folder in $folders_nettcrstruc_str; do
-            folder_path="$output_inference/$folder"
-            mkdir -p $output_nettcrstruct_datareformatting
-            echo "Submitting nettcrstruct prepare input job for $folder"
-            #python scripts/prepare_input_nettcrstruc.py -i $folder_path -o $output_nettcrstruct_datareformatting
-            apptainer exec \
-            --bind "$folder_path:/mnt/input_folder" \
-            --bind "$output_nettcrstruct_datareformatting:/mnt/output_data" \
-            --bind "$src:/mnt/source" \
-            "$IMAGE" \
-            python /mnt/source/scripts/prepare_input_nettcrstruc.py \
-                -i /mnt/input_folder \
-                -o /mnt/output_data \
-                -n $folder
-        done
-    else
-        echo "Skipping input reformatting for nettcrstruct"
-    fi
+    for folder in $folders_nettcrstruc_str; do
+        folder_path="$output_inference/$folder"
+        mkdir -p $output_nettcrstruct_datareformatting
+        echo "Submitting nettcrstruct prepare input job for $folder"
+        python -m structureTCR.nettcrstruc.prepare_input_nettcrstruc -i "$folder_path" -o "$output_nettcrstruct_datareformatting" -n "$folder"
+    done
+else
+    echo "Skipping input reformatting for nettcrstruct"
+fi
 
+if $COMPUTE_NETTCRSTRUC; then
+
+    echo "Computing reranking with nettcrstruct"
+
+    if [[ -z "${FOLDERS_NETTCRSTRUC:-}" ]]; then
+        echo "FOLDERS not provided in config — processing all subfolders in $output_inference"
+        #folders_nettcrstruc=$(find "$output_inference" -mindepth 1 -maxdepth 1 -type d -printf '%f\n')
+        mapfile -t folders_nettcrstruc < <(
+        find "$output_inference" -mindepth 1 -maxdepth 1 -type d -printf '%f\n'
+        )
+        #folders_nettcrstruc_str="${folders_nettcrstruc[*]}"
+        folders_nettcrstruc_str=$(printf '%s\n' "${folders_nettcrstruc[@]}")
+
+        echo "Folders to process: $folders_nettcrstruc_str"
+    else
+        #folders_nettcrstruc=$FOLDERS_NETTCRSTRUC
+        read -r -a folders_nettcrstruc <<< "$FOLDERS_NETTCRSTRUC"
+        #folders_nettcrstruc_str="${folders_nettcrstruc[*]}"
+        folders_nettcrstruc_str=$(printf '%s\n' "${folders_nettcrstruc[@]}")
+        echo "Using folders from config. Folders to process: $folders_nettcrstruc_str"
+    fi
     num_folders=${#folders_nettcrstruc[@]}
     echo "Submitting netttcrstruct for $num_folders folders"
-    jobid=$(sbatch --parsable --wait --array=1-${num_folders}%4 scripts/run_nettcrstruc.sh "$output_nettcrstruct_datareformatting" "$logs_path_nettcrstruct" "$ENSEMBLE" "$suffix_output_inference" "$folders_nettcrstruc_str")
+    #jobid=$(sbatch --parsable --wait --array=1-${num_folders}%1 scripts/run_nettcrstruc.sh "$output_nettcrstruct_datareformatting" "$logs_path_nettcrstruct" "$ENSEMBLE" "$suffix_output_inference" "$folders_nettcrstruc_str")
+    jobid=$(sbatch --parsable --wait src/structureTCR/launch_nettcrstruct_parallel.sh "$output_nettcrstruct_datareformatting" "$logs_path_nettcrstruct" "$ENSEMBLE" "$suffix_output_inference" "$folders_nettcrstruc_str")
     echo "sbatch exit code: $?"
     echo "Job $jobid for nettcrstruct finished."
-    #python scripts/collect_nettcrstruct_reranking.py -i $output_nettcrstruct_datareformatting -o $output_inference
-    apptainer exec \
-    --bind "$output_nettcrstruct_datareformatting:/mnt/input_data" \
-    --bind "$output_inference:/mnt/output_inference" \
-    --bind "$src:/mnt/source" \
-    "$IMAGE" \
-    python /mnt/source/scripts/collect_nettcrstruct_reranking.py \
-        -i /mnt/input_data \
-        -o /mnt/output_inference
-    echo "Removing extra cif files generated"
-    find "$output_nettcrstruct_datareformatting" -mindepth 3 -maxdepth 3 -type f -name "*.cif" -delete
-
-
 else
-    echo "Skipping nettcrstruc computation"
+    echo "Skipping nettcrstruct computation"
+fi
 
+if $COLLECT_NETTCRSTRUC_RESULTS; then
+    echo "Collecting nettcrstruct results"
+
+    python -m structureTCR.nettcrstruc.collect_nettcrstruct_reranking -i "$output_nettcrstruct_datareformatting" -o "$output_inference"
+    echo "Removing extra cif files generated"
+    find "$output_nettcrstruct_datareformatting" -mindepth 4 -maxdepth 4 -type f -name "*.cif" -delete
 fi
 
 echo "Pipeline completed"
+
