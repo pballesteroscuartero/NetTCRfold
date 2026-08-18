@@ -46,7 +46,7 @@ max_array_task_id() {
 
 #Define paths
 suffix_output_inference=$SUFFIX_OUTPUT
-suffix_output_datagen=$SUFFIX_DATAGEN
+suffix_output_datagen="${SUFFIX_DATAGEN:-}"
 
 output_base=$OUTPUT_DIR
 ARRAY_MAP_DATA="$src/data/chainid_to_array.txt"
@@ -91,6 +91,13 @@ if $RUN_DATA_GENERATION_PIPELINE; then
     echo "Detected TOTAL_TASKS_DATA=$TOTAL_TASKS_DATA from $ARRAY_MAP_DATA"
 
     read -r -a combinations <<< "${TEMPLATE_SELECTION_METHODS:-onquery}"
+
+    for m in "${combinations[@]}"; do
+        if [[ "$m" != "onquery" && "$m" != "standard" ]]; then
+            echo "ERROR: invalid TEMPLATE_SELECTION_METHODS value '$m' — only 'onquery' and 'standard' are supported" >&2
+            exit 1
+        fi
+    done
 
     for template_selection_method in "${combinations[@]}"; do
         echo "Running AF data generation step with template selection method ${template_selection_method}:"
