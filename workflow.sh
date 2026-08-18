@@ -27,6 +27,9 @@ dockq_repo=$DOCKQ_REPO
 NUM_METRIC_SPLITS="${NUM_METRIC_SPLITS:-1}"
 CONCURRENT_METRICS="${CONCURRENT_METRICS:-1}"
 
+#Which array index to start submitting from (override in config if needed)
+GLOBAL_START="${GLOBAL_START:-1}"
+
 #Detects the largest ArrayTaskID in a tab-separated *_to_array.txt file
 #(see structureTCR.jsonPrep.dataPreprocessing)
 max_array_task_id() {
@@ -48,18 +51,18 @@ max_array_task_id() {
 suffix_output_inference=$SUFFIX_OUTPUT
 suffix_output_datagen="${SUFFIX_DATAGEN:-}"
 
-output_base=$OUTPUT_DIR
+output_base=$DATA_DIR
 ARRAY_MAP_DATA="$src/data/chainid_to_array.txt"
 ARRAY_MAP_INFERENCE="$src/data/samplename_to_array.txt"
-output_savedata="${output_base}/data/af3_output"
-input_basejson="${output_base}/data/jsonFiles"
+output_savedata="${output_base}/af3_output"
+input_basejson="${output_base}/jsonFiles"
 output_customjson="${input_basejson}/customJSON${suffix_output_datagen}/"
 output_datageneration="${output_savedata}/dataPipelineOut${suffix_output_datagen}/"
 output_inference="${output_savedata}/structInference${suffix_output_inference}/"
-output_nettcrstruct_datareformatting="${output_base}/data/nettcrstruc${suffix_output_inference}"
+output_nettcrstruct_datareformatting="${output_base}/nettcrstruc${suffix_output_inference}"
 
 
-logs_path="${output_base}/logs/" 
+logs_path="../${output_base}/logs/" 
 logs_path_datageneration="${logs_path}/af3_datageneration_workflow${suffix_output_datagen}/"      
 logs_path_inference="${logs_path}/af3_inference${suffix_output_inference}/"
 logs_path_nettcrstruct="${logs_path}/nettcrstruc"
@@ -76,8 +79,8 @@ if $RUN_JSON_WITH_MSA_TEMPLATE_GENERATION; then
     echo "Performing data preprocessing step: Generating JSON for data generation step with MSA and Template"
 
     python -m structureTCR.jsonPrep.dataPreprocessing \
-        -i "$INPUT_DB/$INPUT_FILE" \
-        -o "$output_base/data" \
+        -i "$output_base/$INPUT_FILE" \
+        -o "$output_base" \
         -m "$mhcdb"
 
     echo "Data preprocessing finished"
@@ -90,18 +93,19 @@ if $RUN_DATA_GENERATION_PIPELINE; then
     TOTAL_TASKS_DATA=$(max_array_task_id "$ARRAY_MAP_DATA")
     echo "Detected TOTAL_TASKS_DATA=$TOTAL_TASKS_DATA from $ARRAY_MAP_DATA"
 
-    read -r -a combinations <<< "${TEMPLATE_SELECTION_METHODS:-onquery}"
+    read -r -a combinations <<< "${TEMPLATE_SELECTION_METHOD:-onquery}"
 
     for m in "${combinations[@]}"; do
         if [[ "$m" != "onquery" && "$m" != "standard" ]]; then
-            echo "ERROR: invalid TEMPLATE_SELECTION_METHODS value '$m' — only 'onquery' and 'standard' are supported" >&2
+            echo "ERROR: invalid TEMPLATE_SELECTION_METHOD value '$m' — only 'onquery' and 'standard' are supported" >&2
             exit 1
         fi
     done
 
     for template_selection_method in "${combinations[@]}"; do
-        echo "Running AF data generation step with template selection method ${template_selection_method}:"
         output_folder="${output_datageneration}/template_${template_selection_method}"
+        echo "Running AF data generation step with template selection method ${template_selection_method}. Results will be saved in $output_folder"
+
         max_array=1000 
   
         for start in $(seq $GLOBAL_START $max_array $TOTAL_TASKS_DATA); do
@@ -130,7 +134,7 @@ if $RUN_CUSTOM_JSON_GENERATION; then
     python -m structureTCR.jsonPrep.create_custom_json_reconstruct \
         -i "$output_datageneration" \
         -o "$output_customjson" \
-        -d "$INPUT_DB/${INPUT_FILE%.csv}_hla_withid.csv"
+        -d "$output_base/${INPUT_FILE%.csv}_hla_withid.csv"
         
     echo "Custom JSON input generation finished. Files saved in $output_customjson"
 else

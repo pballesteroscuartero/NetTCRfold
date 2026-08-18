@@ -6,8 +6,8 @@
 #SBATCH --mem=500MB
 #SBATCH --time=48:00:00
 #SBATCH --nodelist=compute02,compute03,compute04,compute05
-#SBATCH --output=/home/projects2/pbacu/projects/structureTCR/structurePipeline/logs/af3_datageneration_workflow/smalldb/slurm_%A_%a.out
-#SBATCH --error=/home/projects2/pbacu/projects/structureTCR/structurePipeline/logs/af3_datageneration_workflow/smalldb/slurm_%A_%a.err
+#SBATCH --output=/home/projects2/pbacu/projects/NetTCRfold/logs/af3_datageneration_workflow/smalldb/slurm_%A_%a.out
+#SBATCH --error=/home/projects2/pbacu/projects/NetTCRfold/logs/af3_datageneration_workflow/smalldb/slurm_%A_%a.err
 
 #For afbenchmark array 25, for schumacher array 603, for nettcr array 13956
 #Usage example: sbatch runAF3_dataGeneration.sh 
@@ -18,7 +18,6 @@ output_dir=$3
 logs_path=$4
 template_selection_method=$5
 start_id=$6
-identity_threshold=$7
 
 mkdir -p ${logs_path}
 GLOBAL_TASK_ID=$((${start_id} + ${SLURM_ARRAY_TASK_ID} - 1))
