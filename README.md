@@ -49,3 +49,4 @@ Required a csv with the columns:
         - template_selection_method: Which template selection method to be used. Set by TEMPLATE_SELECTION_METHOD in config
         - start_id: Which chain ID to start processing. Set by GLOBAL_START in config. If not provided set to 1 by deault.
 
+3. RUN_CUSTOM_JSON_GENERATION: In this step, the desired MSA and template configuration is applied to the data,

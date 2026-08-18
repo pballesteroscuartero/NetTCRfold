@@ -71,6 +71,7 @@ logs_path_nettcrstruct="${logs_path}/nettcrstruc"
 
 ##Redirect log
 name_log="${output_base%/}"
+name_log="${name_log%/*}"
 name_log="${name_log##*/}"
 exec >"${src}/logs/${name_log}${suffix_output_inference}_${SLURM_JOB_ID}.out" 2>"${src}/logs/${name_log}${suffix_output_inference}_${SLURM_JOB_ID}.err"
 
@@ -131,10 +132,11 @@ fi
 
 if $RUN_CUSTOM_JSON_GENERATION; then
     echo "Generating custom JSON input files with different MSA and Template settings"
-    python -m structureTCR.jsonPrep.create_custom_json_reconstruct \
+    python -m structureTCR.jsonPrep.create_custom_json \
         -i "$output_datageneration" \
         -o "$output_customjson" \
-        -d "$output_base/${INPUT_FILE%.csv}_hla_withid.csv"
+        -d "$output_base/${INPUT_FILE%.csv}_hla_withid.csv" \
+        -c "${MSA_TEMPLATE_COMBINATIONS:-unpairedMSA_onquery}"
         
     echo "Custom JSON input generation finished. Files saved in $output_customjson"
 else
