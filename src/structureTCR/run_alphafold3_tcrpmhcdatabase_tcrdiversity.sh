@@ -1,32 +1,23 @@
 #! /bin/bash
-# static variables (expect alphafold3 resources to be in directory as this file)
-export AF3_RESOURCES_DIR="/home/projects2/pbacu/repositories/AF3TCR/alphafold3/"
+# AF3_RESOURCES_DIR must be set in the environment (see configs/env.cfg.example)
+: "${AF3_RESOURCES_DIR:?AF3_RESOURCES_DIR is not set — define it in configs/env.cfg (see configs/env.cfg.example)}"
 export AF3_SRC=${AF3_RESOURCES_DIR}
-export AF3_IMAGE=${AF3_RESOURCES_DIR}/image/alphafold3_tcrpmhc_tcrdivfilt_finalImage_cuda126-py312.sif
-#export AF3_IMAGE=${AF3_RESOURCES_DIR}/image/alphafold3_tcrpmhc_tcrdivfilt_onQueryWith100MSA_cuda126-py312.sif
+export AF3_IMAGE=${AF3_IMAGE}
+#export AF3_IMAGE=${AF3_RESOURCES_DIR}/image/alphafold3_tcrpmhc_tcrdivfilt_finalImage_cuda126-py312.sif
 export AF3_MODEL_PARAMETERS_DIR=${AF3_RESOURCES_DIR}/weights
 export AF3_DATABASES_DIR=${AF3_RESOURCES_DIR}/tcrpmhc_databases
-
 
 # user variables
 export AF3_INPUTDIR=$1
 export AF3_OUTPUTDIR=$2
 export DATA_PIPELINE=$3
 export INFERENCE=$4
-export uniprot_on="${5:-paired}"
-export template_mode="${6:-standard}"
-export identity_threshold="${7:-0.95}"
-export NUM_SEEDS="${8:-1}"
-export NUM_DIFFUSION="${9:-5}"
+export template_mode="${5:-standard}"
+export NUM_SEEDS="${6:-1}"
+export NUM_DIFFUSION="${7:-5}"
 
-MSA_ARG=()
 TEMPLATE_ARG=()
 SEED_ARG=()
-#FULL_DB=()
-
-if [ "$uniprot_on" = "unpaired" ]; then
-    MSA_ARG+=(--unpaired_with_uniprot)
-fi
 
 if [ "$template_mode" = "onquery" ]; then
     TEMPLATE_ARG+=(--only_query_for_template)
@@ -36,11 +27,6 @@ fi
 if [ "$NUM_SEEDS" -gt 1 ]; then
     SEED_ARG+=(--num_seeds="$NUM_SEEDS")
 fi
-
-#FULL_DB+=(--small_bfd_database_path=/mnt/tcrpmhc_databases/bfd-first_non_consensus_sequences.fasta --mgnify_database_path=/mnt/tcrpmhc_databases/mgnify.fasta --uniprot_cluster_annot_database_path=/mnt/tcrpmhc_databases/uniprot_all_2021_04.fa --uniref90_database_path=/mnt/tcrpmhc_databases/uniref90_2022_05.fa --seqres_database_path=/mnt/tcrpmhc_databases/pdb_seqres_2022_09_28.fasta)
-#MSARED_DB+=(--seqres_database_path=/mnt/tcrpmhc_databases/pdb_seqres_2022_09_28.fasta)
-#TEMPLATERED_DB+=(--small_bfd_database_path=/mnt/tcrpmhc_databases/bfd-first_non_consensus_sequences.fasta --mgnify_database_path=/mnt/tcrpmhc_databases/mgnify.fasta --uniprot_cluster_annot_database_path=/mnt/tcrpmhc_databases/uniprot_all_2021_04.fa --uniref90_database_path=/mnt/tcrpmhc_databases/uniref90_2022_05.fa --seqres_database_path=/mnt/tcrpmhc_databases/pdb_seqres_tcrpmhc_iedb_mhc_tcr_stcrdab.txt)
-#ALLRED_DB+=(--seqres_database_path=/mnt/tcrpmhc_databases/pdb_seqres_tcrpmhc_iedb_mhc_tcr_stcrdab_abTCR_onlyMHCbound_MHC1.txt)
 
 # print paths 
 echo AlphaFold3 resource: $AF3_RESOURCES_DIR
@@ -68,7 +54,5 @@ apptainer exec \
      --run_data_pipeline=$DATA_PIPELINE \
      --run_inference=$INFERENCE \
      --num_diffusion_samples=$NUM_DIFFUSION \
-     --identity_threshold_tcr_template_selection=$identity_threshold \
      "${SEED_ARG[@]}" \
-     "${TEMPLATE_ARG[@]}" \
-     "${MSA_ARG[@]}"
+     "${TEMPLATE_ARG[@]}"

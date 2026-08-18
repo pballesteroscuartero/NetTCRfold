@@ -27,11 +27,30 @@ dockq_repo=$DOCKQ_REPO
 NUM_METRIC_SPLITS="${NUM_METRIC_SPLITS:-1}"
 CONCURRENT_METRICS="${CONCURRENT_METRICS:-1}"
 
+#Detects the largest ArrayTaskID in a tab-separated *_to_array.txt file
+#(see structureTCR.jsonPrep.dataPreprocessing)
+max_array_task_id() {
+    local file="$1"
+    if [[ ! -s "$file" ]]; then
+        echo "ERROR: array map file not found or empty: $file (run the data preprocessing step first)" >&2
+        exit 1
+    fi
+    local max
+    max=$(awk -F'\t' 'NR>1 && $1+0>max {max=$1+0} END {print max+0}' "$file")
+    if [[ "$max" -le 0 ]]; then
+        echo "ERROR: could not determine the largest ArrayTaskID in $file" >&2
+        exit 1
+    fi
+    echo "$max"
+}
+
 #Define paths
 suffix_output_inference=$SUFFIX_OUTPUT
 suffix_output_datagen=$SUFFIX_DATAGEN
 
 output_base=$OUTPUT_DIR
+ARRAY_MAP_DATA="$src/data/chainid_to_array.txt"
+ARRAY_MAP_INFERENCE="$src/data/samplename_to_array.txt"
 output_savedata="${output_base}/data/af3_output"
 input_basejson="${output_base}/data/jsonFiles"
 output_customjson="${input_basejson}/customJSON${suffix_output_datagen}/"
@@ -45,7 +64,7 @@ logs_path_datageneration="${logs_path}/af3_datageneration_workflow${suffix_outpu
 logs_path_inference="${logs_path}/af3_inference${suffix_output_inference}/"
 logs_path_nettcrstruct="${logs_path}/nettcrstruc"
 
-mkdir -p $output_customjson
+#mkdir -p $output_customjson
 
 ##Redirect log
 name_log="${output_base%/}"
@@ -56,7 +75,7 @@ exec >"${src}/logs/${name_log}${suffix_output_inference}_${SLURM_JOB_ID}.out" 2>
 if $RUN_JSON_WITH_MSA_TEMPLATE_GENERATION; then
     echo "Performing data preprocessing step: Generating JSON for data generation step with MSA and Template"
 
-    python -m structureTCR.jsonPrep.dataPreprocessing_optimized \
+    python -m structureTCR.jsonPrep.dataPreprocessing \
         -i "$INPUT_DB/$INPUT_FILE" \
         -o "$output_base/data" \
         -m "$mhcdb"
@@ -68,22 +87,14 @@ else
 fi
 
 if $RUN_DATA_GENERATION_PIPELINE; then
-    #combinations=(
-    #"paired onquery"
-    #"unpaired onquery"
-    #)  
+    TOTAL_TASKS_DATA=$(max_array_task_id "$ARRAY_MAP_DATA")
+    echo "Detected TOTAL_TASKS_DATA=$TOTAL_TASKS_DATA from $ARRAY_MAP_DATA"
 
-    combinations=(
-    "paired onquery"
-    #"paired standard"
-    #"unpaired standard"
-    )  
-    
-    for combo in "${combinations[@]}"; do
-        read -r uniprot_msa template_selection_method <<< "$combo"
+    read -r -a combinations <<< "${TEMPLATE_SELECTION_METHODS:-onquery}"
 
-        echo "Running AF data generation step with MSA (uniprot in ${uniprot_msa}) and Template with selection method ${template_selection_method}:"  
-        output_folder="${output_datageneration}/uniprotOn_${uniprot_msa}_template_${template_selection_method}"
+    for template_selection_method in "${combinations[@]}"; do
+        echo "Running AF data generation step with template selection method ${template_selection_method}:"
+        output_folder="${output_datageneration}/template_${template_selection_method}"
         max_array=1000 
   
         for start in $(seq $GLOBAL_START $max_array $TOTAL_TASKS_DATA); do
@@ -91,13 +102,13 @@ if $RUN_DATA_GENERATION_PIPELINE; then
             [ $end -gt $TOTAL_TASKS_DATA ] && end=$TOTAL_TASKS_DATA
 
             array_length=$((${end} - ${start} + 1))
-            echo "Submitting array: $start-$end%$CONCURRENT (length $array_length) for combo: $combo"
+            echo "Submitting array: $start-$end%$CONCURRENT (length $array_length) for template selection method: $template_selection_method"
 
             jobid=$(sbatch --parsable --wait \
             --array=1-${array_length}%${CONCURRENT} \
             src/structureTCR/runAF3_dataGeneration.sh \
             $ARRAY_MAP_DATA $input_basejson/"json_msa_template" $output_folder $logs_path_datageneration \
-            $uniprot_msa $template_selection_method $start $IDENTITY_THRESHOLD) 
+            $template_selection_method $start) 
 
             echo "Job $jobid finished."
         done
@@ -122,7 +133,10 @@ fi
 #2. Perform af3 inference step in selected folders
 if $RUN_AF3_INFERENCE; then
     echo "Running AF3 inference step"
-    
+
+    TOTAL_TASKS_INFERENCE=$(max_array_task_id "$ARRAY_MAP_INFERENCE")
+    echo "Detected TOTAL_TASKS_INFERENCE=$TOTAL_TASKS_INFERENCE from $ARRAY_MAP_INFERENCE"
+
     if [[ -z "${FOLDERS_INFERENCE:-}" ]]; then
         echo "FOLDERS not provided in config — processing all subfolders in $output_customjson"
         folders=$(find "$output_customjson" -mindepth 1 -maxdepth 1 -type d -printf '%f\n')

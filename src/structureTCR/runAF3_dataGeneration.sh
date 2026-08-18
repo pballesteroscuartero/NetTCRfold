@@ -16,19 +16,18 @@ config=$1
 json_path=$2
 output_dir=$3
 logs_path=$4
-uniprot_msa=$5
-template_selection_method=$6
-start_id=$7
-identity_threshold=$8
+template_selection_method=$5
+start_id=$6
+identity_threshold=$7
 
 mkdir -p ${logs_path}
 GLOBAL_TASK_ID=$((${start_id} + ${SLURM_ARRAY_TASK_ID} - 1))
 sample=$(awk -v ArrayTaskID=$GLOBAL_TASK_ID '$1==ArrayTaskID {print $2}' $config)
-exec >"${logs_path}/${GLOBAL_TASK_ID}_${sample}_${uniprot_msa}_${template_selection_method}.out" 2>"${logs_path}/${GLOBAL_TASK_ID}_${sample}_${uniprot_msa}_${template_selection_method}.err"
+exec >"${logs_path}/${GLOBAL_TASK_ID}_${sample}_${template_selection_method}.out" 2>"${logs_path}/${GLOBAL_TASK_ID}_${sample}_${template_selection_method}.err"
 
 export input="${json_path}/${sample}"
 export output="${output_dir}"
 mkdir -p "$output"
-bash src/structureTCR/run_alphafold3_tcrpmhcdatabase_tcrdiversity.sh  "$input" "$output" TRUE FALSE "$uniprot_msa" "$template_selection_method" "$identity_threshold"
+bash src/structureTCR/run_alphafold3_tcrpmhcdatabase_tcrdiversity.sh  "$input" "$output" TRUE FALSE "$template_selection_method"
  
 
