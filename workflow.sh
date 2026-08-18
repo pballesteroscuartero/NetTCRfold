@@ -12,37 +12,34 @@
 #Strict execution mode
 set -Eeuo pipefail
 
-#Usage example sbatch dataGenerationWorklow.sh + Write any change needed in config file
-source /home/projects2/pbacu/utils/Miniconda/etc/profile.d/conda.sh
+#Machine/install-specific paths — see configs/env.cfg.example
+source configs/env.cfg
+source "$CONDA_SH"
 conda activate structureTCR
 
 source configs/config.cfg
 
-
-src=/home/projects2/pbacu/projects/NetTCRfold
+src=$PROJECT_ROOT
 mhcdb=$src/databases/mhc_sequences
-dockq_repo=/home/projects2/pbacu/repositories/DockQ
+dockq_repo=$DOCKQ_REPO
 
 #Metrics collection array-job sizing (override in config if needed)
-NUM_METRIC_SPLITS="${NUM_METRIC_SPLITS:-0}"
-CONCURRENT_METRICS="${CONCURRENT_METRICS:-0}"
+NUM_METRIC_SPLITS="${NUM_METRIC_SPLITS:-1}"
+CONCURRENT_METRICS="${CONCURRENT_METRICS:-1}"
 
 #Define paths
 suffix_output_inference=$SUFFIX_OUTPUT
 suffix_output_datagen=$SUFFIX_DATAGEN
 
 output_base=$OUTPUT_DIR
-
-#dbComparison/newResults/
 output_savedata="${output_base}/data/af3_output"
 input_basejson="${output_base}/data/jsonFiles"
 output_customjson="${input_basejson}/customJSON${suffix_output_datagen}/"
-output_datageneration="${output_savedata}/small_db/dataPipelineOut${suffix_output_datagen}/"
-output_inference="${output_savedata}/small_db/structInference${suffix_output_inference}/"
+output_datageneration="${output_savedata}/dataPipelineOut${suffix_output_datagen}/"
+output_inference="${output_savedata}/structInference${suffix_output_inference}/"
 output_nettcrstruct_datareformatting="${output_base}/data/nettcrstruc${suffix_output_inference}"
 
 
-#dbComparison/newLogs/
 logs_path="${output_base}/logs/" 
 logs_path_datageneration="${logs_path}/af3_datageneration_workflow${suffix_output_datagen}/"      
 logs_path_inference="${logs_path}/af3_inference${suffix_output_inference}/"
@@ -53,7 +50,7 @@ mkdir -p $output_customjson
 ##Redirect log
 name_log="${output_base%/}"
 name_log="${name_log##*/}"
-exec >"/home/projects2/pbacu/projects/structureTCR/structurePipeline/logs/${name_log}${suffix_output_inference}_${SLURM_JOB_ID}.out" 2>"/home/projects2/pbacu/projects/structureTCR/structurePipeline/logs/${name_log}${suffix_output_inference}_${SLURM_JOB_ID}.err"
+exec >"${src}/logs/${name_log}${suffix_output_inference}_${SLURM_JOB_ID}.out" 2>"${src}/logs/${name_log}${suffix_output_inference}_${SLURM_JOB_ID}.err"
 
 ##1.Perform data preprocessing
 if $RUN_JSON_WITH_MSA_TEMPLATE_GENERATION; then
