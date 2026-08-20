@@ -94,6 +94,8 @@ if $RUN_DATA_GENERATION_PIPELINE; then
     TOTAL_TASKS_DATA=$(max_array_task_id "$ARRAY_MAP_DATA")
     echo "Detected TOTAL_TASKS_DATA=$TOTAL_TASKS_DATA from $ARRAY_MAP_DATA"
 
+    #Combine the TEMPLATE_SELECTION_METHOD and MSA_TYPE into arrays for iteration
+    read -r -a msa_combinations <<< "${MSA_TYPE:-unpaired}"
     read -r -a combinations <<< "${TEMPLATE_SELECTION_METHOD:-onquery}"
 
     for m in "${combinations[@]}"; do
@@ -103,30 +105,41 @@ if $RUN_DATA_GENERATION_PIPELINE; then
         fi
     done
 
-    for template_selection_method in "${combinations[@]}"; do
-        output_folder="${output_datageneration}/template_${template_selection_method}"
-        echo "Running AF data generation step with template selection method ${template_selection_method}. Results will be saved in $output_folder"
+    for m in "${msa_combinations[@]}"; do
+        if [[ "$m" != "unpaired" && "$m" != "paired" && "$m" != "full" ]]; then
+            echo "ERROR: invalid MSA_TYPE value '$m' — only 'unpaired', 'paired', and 'full' are supported" >&2
+            exit 1
+        fi
+    done
 
-        max_array=1000 
-  
+    for msa_type in "${msa_combinations[@]}"; do
+
+    for template_selection_method in "${combinations[@]}"; do
+    
+        output_folder="${output_datageneration}/msa_${msa_type}_template_${template_selection_method}"
+        echo "Running AF data generation step with MSA type ${msa_type} and template selection method ${template_selection_method}. Results will be saved in $output_folder"
+
+        max_array=1000
+
         for start in $(seq $GLOBAL_START $max_array $TOTAL_TASKS_DATA); do
             end=$((${start} + ${max_array} - 1))
             [ $end -gt $TOTAL_TASKS_DATA ] && end=$TOTAL_TASKS_DATA
 
             array_length=$((${end} - ${start} + 1))
-            echo "Submitting array: $start-$end%$CONCURRENT (length $array_length) for template selection method: $template_selection_method"
+            echo "Submitting array: $start-$end%$CONCURRENT (length $array_length) for MSA type: $msa_type, template selection method: $template_selection_method"
 
             jobid=$(sbatch --parsable --wait \
             --array=1-${array_length}%${CONCURRENT} \
             src/structureTCR/runAF3_dataGeneration.sh \
             $ARRAY_MAP_DATA $input_basejson/"json_msa_template" $output_folder $logs_path_datageneration \
-            $template_selection_method $start) 
+            $msa_type $template_selection_method $start)
 
             echo "Job $jobid finished."
         done
 
     done
-else 
+    done
+else
     echo "Skipping AF3 data generation step"
 fi
 

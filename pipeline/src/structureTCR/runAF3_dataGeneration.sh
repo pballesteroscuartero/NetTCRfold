@@ -16,17 +16,18 @@ config=$1
 json_path=$2
 output_dir=$3
 logs_path=$4
-template_selection_method=$5
-start_id=$6
+msa_type=$5
+template_selection_method=$6
+start_id=$7
 
 mkdir -p ${logs_path}
 GLOBAL_TASK_ID=$((${start_id} + ${SLURM_ARRAY_TASK_ID} - 1))
 sample=$(awk -v ArrayTaskID=$GLOBAL_TASK_ID '$1==ArrayTaskID {print $2}' $config)
-exec >"${logs_path}/${GLOBAL_TASK_ID}_${sample}_${template_selection_method}.out" 2>"${logs_path}/${GLOBAL_TASK_ID}_${sample}_${template_selection_method}.err"
+exec >"${logs_path}/${GLOBAL_TASK_ID}_${sample}_${msa_type}_${template_selection_method}.out" 2>"${logs_path}/${GLOBAL_TASK_ID}_${sample}_${msa_type}_${template_selection_method}.err"
 
 export input="${json_path}/${sample}"
 export output="${output_dir}"
 mkdir -p "$output"
-bash src/structureTCR/run_alphafold3_tcrpmhcdatabase_tcrdiversity.sh  "$input" "$output" TRUE FALSE "$template_selection_method"
+bash src/structureTCR/run_alphafold3_tcrpmhcdatabase_tcrdiversity.sh  "$input" "$output" TRUE FALSE "$msa_type" "$template_selection_method"
  
 
