@@ -53,11 +53,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "-c",
         "--combinations",
-        default="unpaired_onqueryTemplate",
+        default="unpaired_onquery",
         help=(
             "Space-separated list of <msaMode>_<templateMode> combinations to generate. "
             f"msaMode: {sorted(MSA_MODES)}. templateMode: {sorted(TEMPLATE_MODES)}. "
-            "Example: 'unpaired_onqueryTemplate paired_pairedMSA_onqueryTemplate full_no'"
+            "Example: 'unpaired_onquery paired_pairedMSA_onquery full_no'"
         ),
     )
     return parser.parse_args()
