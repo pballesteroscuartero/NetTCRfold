@@ -48,7 +48,7 @@ max_array_task_id() {
 }
 
 #Define paths
-suffix_output_inference=$SUFFIX_OUTPUT
+suffix_output_inference="${SUFFIX_OUTPUT:-}"
 suffix_output_datagen="${SUFFIX_DATAGEN:-}"
 
 ARRAY_MAP_DATA="${DATA_DIR}/chainid_to_array.txt"
@@ -75,16 +75,12 @@ mkdir -p "${logs_path}/"
 #logs_path_datageneration="${logs_path}/af3_datageneration_workflow${suffix_output_datagen}/"
 #logs_path_inference="${logs_path}/af3_inference${suffix_output_inference}/"
 
-#Redirected (per-task, internal `exec`) logs for data-generation/inference now live inside
-#DATA_DIR's parent folder instead, e.g. examples/logs/af3_datageneration_workflow/...
+
 logs_path_datageneration="${logs_path_inside}/af3_datageneration_workflow${suffix_output_datagen}/"
 logs_path_inference="${logs_path_inside}/af3_inference${suffix_output_inference}/"
 
-#SLURM-level --output/--error logs for data-generation/inference/metrics — next to workflow.sh
-logs_path_slurm="${src}/logs"
-mkdir -p "${logs_path_slurm}"
-logs_path_datageneration_slurm="${logs_path_slurm}/af3_datageneration_workflow${suffix_output_datagen}/"
-logs_path_inference_slurm="${logs_path_slurm}/af3_inference${suffix_output_inference}/"
+logs_path_datageneration_slurm="${logs_path}/af3_datageneration_workflow${suffix_output_datagen}/"
+logs_path_inference_slurm="${logs_path}/af3_inference${suffix_output_inference}/"
 
 ##Redirect log
 name_log="${DATA_DIR%/*}"
@@ -158,7 +154,7 @@ if $RUN_CUSTOM_JSON_GENERATION; then
         -i "$output_datageneration" \
         -o "$output_customjson" \
         -d "$DATA_DIR/${INPUT_FILE%.csv}_hla_withid.csv" \
-        -c "${MSA_TEMPLATE_COMBINATIONS:-unpairedMSA_onquery}"
+        -c "${MSA_TEMPLATE_COMBINATIONS:-unpaired_onquery}"
         
     echo "Custom JSON input generation finished. Files saved in $output_customjson"
 else
@@ -197,7 +193,7 @@ if $RUN_AF3_INFERENCE; then
             --array=1-${array_length}%${CONCURRENT_INFERENCE} \
             --output="${logs_path_inference_slurm}/slurm_%A_%a.out" \
             --error="${logs_path_inference_slurm}/slurm_%A_%a.err" \
-            src/NetTCRfold/runAF3inference.sh \
+            src/NetTCRfold/runAF3_inference.sh \
             "$folder_path" "$output_inference" "$logs_path_inference" \
             "$ARRAY_MAP_INFERENCE" "$NUM_SEEDS" "$NUM_DIFFUSION" "$start")
 

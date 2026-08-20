@@ -22,6 +22,16 @@ wget -P alphafold3_tcrpmhc/src/alphafold3/constants/converters \
   https://services.healthtech.dtu.dk/suppl/immunology/NetTCRaFold-1.0/chemicalComponents/chemical_component_sets.pickle
 ```
 
+Download AF3 weights from XXXX and place them inside alphafold3_tcrpmhc folder
+
+Download the curated databases with:
+
+```
+add wget command
+```
+
+##TODO: Download dockQ
+
 Install the environment for running the pipeline:
 
 ```
@@ -60,7 +70,7 @@ Required a csv with the columns:
         - jsonFiles: Folder where AF3 inputs will be stored.
             - json_msa_template: Folder containing the inputs for the data generation step. One folder per unique chain, containing the information in AF3's required format.
 
-2. RUN_DATA_GENERATION_PIPELINE: MSA generation and template selection per chain. In this step, both unpaired and paired MSA are computed. The user can choose which to select in the next step. 
+2. RUN_DATA_GENERATION_PIPELINE: MSA generation and template selection per chain. In this step, both unpaired and paired MSA are computed. The user can choose which to select in the next step. The input is an AF3 formatted json of each chain and the output is the MSA and template for that datapoint.
     Section in config file:
         TEMPLATE_SELECTION_METHOD (optional): Select either onquery or standard to set the template selection method that will take place. If not set onquery will be performed
         SUFFIX_DATAGEN (optional): Suffix to append to the datafolder. Useful if multiple settings for dataPipeline are used. E.g Different databases used. If not set, no suffix is set.
@@ -75,4 +85,28 @@ Required a csv with the columns:
         - template_selection_method: Which template selection method to be used. Set by TEMPLATE_SELECTION_METHOD in config
         - start_id: Which chain ID to start processing. Set by GLOBAL_START in config. If not provided set to 1 by deault.
 
-3. RUN_CUSTOM_JSON_GENERATION: In this step, the desired MSA and template configuration is applied to the data,
+3. RUN_CUSTOM_JSON_GENERATION: In this step, the desired MSA and template configuration is applied to the data, and the different chains are pooled back together into the original complexes. The output of this step is the data ready to introduce in the af3_inference pipeline.
+    Section in config file: 
+        MSA_TEMPLATE_COMBINATIONS (optional): Provide the combination one needs to generate in the form of msaType_templateType. The options for MSA type are: unpaired, paired, full (use both paired and unpaired MSA) or no (use No MSA). The options for template are onquery (use sequence for template search), standard (use full MSA profile for template search), no (no template). Options are provided in a string separated by a space. If no options are provided, unpaired_onquery is performed.
+    Code: create_custom_json.py
+    Inputs:
+        - i: Input folder for the reconstruction. The folder named dataPipelineOut{suffix}.
+        - o: General folder to save the reconstructed json files. In the pipeline it's set to DATA_DIR/jsonFiles/customJSON
+        -d Path for the file created in step 1 containing the unique ID per datapoint {input_file}_hla_withid
+        -c combinations string to reconstruct
+
+4. RUN_AF3_INFERENCE: Step to run AF3 inference on the reconstructed JSON files. It takes a folder containing json files and returns the models for each of the datapoints inside that folder.
+    Section in config file:
+        FOLDERS_INFERENCE (optional):  Space separated list containing the name of the folders within jsonFiles/customJSON that one wants to model. For example, to model the datapoints with unpaired MSA and onQuery template folders inference needs to be set to json_unpairedMSA_onqueryTemplate. If nothing is provided, all the folders in jsonFiles/customJSON are processed.
+        SUFFIX_OUTPUT (optional) : Suffix for the AF3 inference folder. If not provided, suffix is set to ""
+        NUM_SEEDS: Number of seeds to use for inference. If not provided, one seed is used
+        NUM_DIFFUSION: Number of diffusion samples to use for inference. If not provided, five samples are produced.
+    Code: runAF3_inference.sh
+    Inputs (in this order):
+        folder_path: Path to the folder containing the json files to process
+        output_inference: Path to the folder where output will be saved
+        logs_path: Path to the folder where the log files will be saved
+        ARRAY_MAP_INFERENCE: Path to the samplename_to_array.txt produced in the first step
+        NUM_SEEDS: Number of seeds
+        NUM_DIFFUSSION: Number of diffusion samples
+        start: Element from samplename_to_array.txt where we start processing
