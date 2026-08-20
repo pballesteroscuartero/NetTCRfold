@@ -62,12 +62,11 @@ output_inference="${output_savedata}/structInference${suffix_output_inference}/"
 output_nettcrstruct_datareformatting="${output_base}/nettcrstruc${suffix_output_inference}"
 
 
-logs_path="../${output_base}/logs/" 
+logs_path="${output_base%/}"
+logs_path="${logs_path%/*}/logs/"
 logs_path_datageneration="${logs_path}/af3_datageneration_workflow${suffix_output_datagen}/"      
 logs_path_inference="${logs_path}/af3_inference${suffix_output_inference}/"
 logs_path_nettcrstruct="${logs_path}/nettcrstruc"
-
-#mkdir -p $output_customjson
 
 ##Redirect log
 name_log="${output_base%/}"
