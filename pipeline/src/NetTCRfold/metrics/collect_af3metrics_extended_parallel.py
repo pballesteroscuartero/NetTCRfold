@@ -17,9 +17,9 @@ import subprocess
 from tqdm import tqdm
 import biotite.structure.io as strucio
 
-from structureTCR.metrics.scoring_utils import is_interface, pae_metrics_perchain_pair, parse_ipsae, get_plddt_score
-from structureTCR.metrics.structure_utils import extract_cdrs_from_structure
-from structureTCR.metrics.ipsae_function import compute_ipsae
+from NetTCRfold.metrics.scoring_utils import is_interface, pae_metrics_perchain_pair, parse_ipsae, get_plddt_score
+from NetTCRfold.metrics.structure_utils import extract_cdrs_from_structure
+from NetTCRfold.metrics.ipsae_function import compute_ipsae
 
 
 def parse_args() -> argparse.Namespace:
@@ -82,9 +82,6 @@ def process_complex(args):
         with open(model_confidences_path) as f:
             af = json.load(f)
 
-        #t2 = time.perf_counter()
-        #df_ipsae = pd.read_csv(ipsae_path, sep=r"\s+", header=0)
-
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", UserWarning)
             structure = strucio.load_structure( structure_path)
@@ -100,9 +97,7 @@ def process_complex(args):
             }
 
         df_ipsae = compute_ipsae(af, afsumm, structure, structure_path, 10, 10)
-        #df_ipsae = pd.read_csv(ipsae_path, sep=r"\s+", header=0)
    
-        #t3 = time.perf_counter()
         if cdrs_cache is None:
             cdrs_cache = extract_cdrs_from_structure(structure_noh)
             
@@ -145,10 +140,8 @@ def main():
 
     # Partition into num_splits contiguous chunks, this job handles only split_idx
     complexes = complexes[args.split_idx::args.num_splits]
-    # (striped split, not contiguous — see note below for why)
 
     tasks = [(c, suffix) for c in complexes]
-    #dfs_meta = []
 
     n_workers = 4
     joint_path = input_path / f"collected_af3metrics_split{args.split_idx}{suffix}.csv"

@@ -13,6 +13,7 @@ set -Eeuo pipefail
 #Usage: sbatch --array=0-<num_splits-1>%<concurrency> collect_metrics_slurm_parallel.sh <folder_path> <suffix> <num_splits> <logs_path>
 #CONDA_SH must be set in the environment (see configs/env.cfg.example); sbatch inherits it
 #from the submitting shell, which sources configs/env.cfg before calling sbatch.
+
 : "${CONDA_SH:?CONDA_SH is not set — define it in configs/env.cfg (see configs/env.cfg.example)}"
 source "$CONDA_SH"
 conda activate structureTCR

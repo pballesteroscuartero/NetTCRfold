@@ -1,7 +1,7 @@
 import numpy as np
 import biotite.structure as struc
 
-from structureTCR.metrics.sequence_utils import get_cdr_from_sequence, convert_3to1
+from NetTCRfold.metrics.sequence_utils import get_cdr_from_sequence, convert_3to1
 
 def get_interface_atoms(structure, chain1, chain2, cutoff=5.0):
     atoms1 = structure[(structure.chain_id == chain1)]

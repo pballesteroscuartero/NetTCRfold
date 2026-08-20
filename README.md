@@ -1,20 +1,22 @@
 ## Installation
 
-Clone the repository: 
+1. Clone the repository: 
 
 ```
 git clone git@github.com:pballesteroscuartero/NetTCRstruc2.git
 cd NetTCRstruc2
 ```
 
-Download the image for running the modified AF3 pipeline from https://services.healthtech.dtu.dk/suppl/immunology/NetTCRaFold-1.0/image link, or create it from the def file provided using the following command **on the repository homepage** (from NetTCRstruc2)
+2. Request access to AF3 weights from XXXX and place them inside alphafold3_tcrpmhc folder
+
+3. Download the image for running the modified AF3 pipeline from https://services.healthtech.dtu.dk/suppl/immunology/NetTCRaFold-1.0/image link
 
 ```
-apptainer build --fakeroot apptainer/alphafold3_tcrpmhc_cuda126-py312.sif apptainer/alphafold3_tcrpmhc_cuda126-py312.def
+wget -P apptainer \
+    https://services.healthtech.dtu.dk/suppl/immunology/NetTCRaFold-1.0/image/
 ```
 
-Download the chemical components from https://services.healthtech.dtu.dk/suppl/immunology/NetTCRaFold-1.0/chemicalComponents and place them in the following path:
-
+4. Download the chemical components from https://services.healthtech.dtu.dk/suppl/immunology/NetTCRaFold-1.0/chemicalComponents and place them in the following path:
 
 ```
 wget -P alphafold3_tcrpmhc/src/alphafold3/constants/converters \
@@ -22,22 +24,23 @@ wget -P alphafold3_tcrpmhc/src/alphafold3/constants/converters \
   https://services.healthtech.dtu.dk/suppl/immunology/NetTCRaFold-1.0/chemicalComponents/chemical_component_sets.pickle
 ```
 
-Download AF3 weights from XXXX and place them inside alphafold3_tcrpmhc folder
-
-Download the curated databases with:
+5. Download the curated databases with:
 
 ```
-add wget command
+wget -P alphafold3_tcrpmhc ##ADD COMMAND
+
 ```
 
-##TODO: Download dockQ
 
-Install the environment for running the pipeline:
+6. Install the environment for running the pipeline:
 
 ```
 conda env create -f pipeline/structureTCR.yml
 pip install -e .
 ```
+
+7. OPTIONAL: If dockQ wants to be used, clone their original repository and specify in the file configs/env.cfg its path
+
 
 ## Input data format:
 
@@ -50,6 +53,10 @@ Required a csv with the columns:
     - pdb_id (optional): pdb_id of the datapoint. 
     - A1, A2, A3, B1, B2, B3 (optional): Sequence of the CDRs1-3 from chain A and B. Used only for naming purposes.
     - name (optional): Unique identifier of each datapoint. If not present, first pdb_id will try to be used as unique identified. If not present, unique identifier will either be peptide_A1_A2_A3_B1_B2_B2 or peptide_TRAaa_TRBaa.
+
+## Config file and environment file
+
+Say that we have examples here etc and brief explanation of the fields
 
 ## Pipeline steps:
 
