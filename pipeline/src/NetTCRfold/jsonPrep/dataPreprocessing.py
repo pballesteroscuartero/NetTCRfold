@@ -5,17 +5,6 @@ from pathlib import Path
 import json
 import re
 
-
-def get_project_root() -> Path:
-    """Returns PROJECT_ROOT from the environment (see configs/env.cfg.example)."""
-    project_root = os.environ.get("PROJECT_ROOT")
-    if not project_root:
-        raise EnvironmentError(
-            "PROJECT_ROOT is not set — define it in configs/env.cfg (see configs/env.cfg.example)"
-        )
-    return Path(project_root)
-
-
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -206,11 +195,8 @@ def main() -> None:
         mask = df["MHCB_aa"].notna()
         df.loc[mask, "MHCB_aa_id"] = ("MHCB_" + df.loc[mask, "MHCB_aa"].astype("category").cat.codes.astype(str))
 
-    array_map_dir = get_project_root() / "data"
-    array_map_dir.mkdir(parents=True, exist_ok=True)
-    samplename_to_array(df, array_map_dir)
-    chainid_to_array(df, array_map_dir)
-
+    samplename_to_array(df, output_path)
+    chainid_to_array(df, output_path)
     df.to_csv(Path(output_path/ f"{Path(input_csv).stem}_hla_withid.csv"))
     
     json_af3(df, Path(output_path / "jsonFiles/"))

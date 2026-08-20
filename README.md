@@ -26,6 +26,7 @@ Install the environment for running the pipeline:
 
 ```
 conda env create -f pipeline/structureTCR.yml
+pip install -e .
 ```
 
 ## Input data format:

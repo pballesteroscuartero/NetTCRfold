@@ -26,6 +26,6 @@ exec >"${logs_path}/${GLOBAL_TASK_ID}_${sample}_${msa_type}_${template_selection
 export input="${json_path}/${sample}"
 export output="${output_dir}"
 mkdir -p "$output"
-bash src/structureTCR/run_alphafold3_tcrpmhcdatabase_tcrdiversity.sh  "$input" "$output" TRUE FALSE "$msa_type" "$template_selection_method"
+bash src/NetTCRfold/run_alphafold3_tcrpmhc.sh  "$input" "$output" TRUE FALSE "$msa_type" "$template_selection_method"
  
 
