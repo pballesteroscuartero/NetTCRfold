@@ -5,7 +5,6 @@
 #SBATCH --cpus-per-task=5
 #SBATCH --mem=64G
 #SBATCH --time=250:00:00
-#Submit from the pipeline/ directory; SLURM needs this to exist beforehand: mkdir -p logs
 #SBATCH --output=logs/slurm_%A_%a.out
 #SBATCH --error=logs/slurm_%A_%a.err
 #--nodelist=compute02,compute03,compute04,compute05,compute06
@@ -74,6 +73,7 @@ logs_path_nettcrstruct="${logs_path}/nettcrstruc"
 name_log="${output_base%/}"
 name_log="${name_log%/*}"
 name_log="${name_log##*/}"
+mkdir -p "${src}/logs"
 exec >"${src}/logs/${name_log}${suffix_output_inference}_${SLURM_JOB_ID}.out" 2>"${src}/logs/${name_log}${suffix_output_inference}_${SLURM_JOB_ID}.err"
 
 ##1.Perform data preprocessing
