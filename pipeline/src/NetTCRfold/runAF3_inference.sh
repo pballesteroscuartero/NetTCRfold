@@ -31,7 +31,7 @@ export input="${folder_path}/${sample}"
 export output="${output_dir}/${folder_name}"
 mkdir -p "$output"
 
-bash src/NetTCRfold/run_alphafold3_tcrpmhc.sh  "$input" "$output" FALSE TRUE "standard" "onquery" ${NUM_SEEDS} ${NUM_DIFFUSION}
+bash src/NetTCRfold/run_alphafold3_tcrpmhc.sh  "$input" "$output" FALSE TRUE "standard" ${NUM_SEEDS} ${NUM_DIFFUSION}
 
 
 
