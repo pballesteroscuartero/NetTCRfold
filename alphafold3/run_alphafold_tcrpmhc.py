@@ -93,12 +93,6 @@ _RUN_INFERENCE = flags.DEFINE_bool(
     'Whether to run inference on the fold inputs.',
 )
 
-_UNPAIRED_WITH_UNIPROT = flags.DEFINE_bool(
-    'unpaired_with_uniprot',
-    False,
-    'Whether to include the Uniprot results also in the unpaired MSA for each chain.',
-)
-
 _UNPAIRED_MSA_ONLY = flags.DEFINE_bool(
     'unpaired_msa_only',
     False,
@@ -109,12 +103,6 @@ _ONLY_QUERY_FOR_TEMPLATE = flags.DEFINE_bool(
     'only_query_for_template',
     False,
     'Whether to only use query for template search. If False, the whole MSA is used.',
-)
-
-_IDENTITY_THRESHOLD = flags.DEFINE_float(
-    "identity_threshold_tcr_template_selection",
-    1.1,
-    "Identity threshold for TCR template selection. If None, uses AF3 default.",
 )
 
 # Binary paths.
@@ -802,10 +790,8 @@ def main(_):
         jackhmmer_n_cpu=_JACKHMMER_N_CPU.value,
         nhmmer_n_cpu=_NHMMER_N_CPU.value,
         max_template_date=max_template_date,
-        unpaired_with_uniprot=_UNPAIRED_WITH_UNIPROT.value,
         unpaired_msa_only=_UNPAIRED_MSA_ONLY.value,
         only_query_for_template=_ONLY_QUERY_FOR_TEMPLATE.value,
-        identity_threshold=_IDENTITY_THRESHOLD.value,
     )
   else:
     data_pipeline_config = None

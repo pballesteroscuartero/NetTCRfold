@@ -380,19 +380,11 @@ def _filter_hits(
     min_hit_length: int | None,
     deduplicate_sequences: bool,
     max_hits: int | None,
-    query_chain_id:str,
-    identity_treshold: float,
 ) -> Sequence[Hit]:
   """Filters hits based on the filter config."""
   filtered_hits = []
   seen_before = set()
 
-  #Introduce if 8 templates are needed for the data generation step
-  #if query_chain_id in ("D", "E"):
-  #  max_hits = 8 
-
-  if identity_treshold!=1.1 and query_chain_id in ("D", "E"):
-    print(f"Identity threshold for TCR chains set to {identity_treshold}")
 
   for hit in hits:
     if not hit.keep(
@@ -413,22 +405,6 @@ def _filter_hits(
         filtered_hits.append(hit)
         continue
     
-    if query_chain_id in ("D", "E"):
-        too_similar = False
-        for kept_hits in filtered_hits:
-          identity = _sequence_identity(
-            hit.output_templates_sequence,
-            kept_hits.output_templates_sequence
-          )
-          print(f"Hit has {identity} identity to previous hit")
-        
-          if identity >= identity_treshold:
-            too_similar = True
-            print(f"Reject hit because it had a {identity} to previous hits")
-            break
-
-        if too_similar:
-          continue
 
     filtered_hits.append(hit)
     if max_hits and len(filtered_hits) == max_hits:
@@ -474,8 +450,6 @@ class Templates:
       cls,
       *,
       query_sequence: str,
-      query_chain_id:str,
-      identity_threshold:float,
       msa_a3m: str,
       max_template_date: datetime.date,
       database_path: os.PathLike[str] | str,
@@ -490,7 +464,6 @@ class Templates:
 
     Args:
       query_sequence: The polymer sequence of the target query.
-      query_chain_id: The ID of the target query.
       msa_a3m: An a3m of related polymers aligned to the query sequence, this is
         used to create an HMM for the hmmsearch run.
       max_template_date: This is used to filter templates for training, ensuring
@@ -520,8 +493,6 @@ class Templates:
     )
     return cls.from_hmmsearch_a3m(
         query_sequence=query_sequence,
-        query_chain_id = query_chain_id,
-        identity_threshold= identity_threshold,
         a3m=hmmsearch_a3m,
         max_template_date=max_template_date,
         query_release_date=query_release_date,
@@ -535,8 +506,6 @@ class Templates:
       cls,
       *,
       query_sequence: str,
-      query_chain_id:str,
-      identity_threshold:float,
       a3m: str,
       max_template_date: datetime.date,
       structure_store: structure_stores.StructureStore,
@@ -548,7 +517,6 @@ class Templates:
 
     Args:
       query_sequence: The polymer sequence of the target query.
-      query_chain_id: The chain ID for the query sequence.
       a3m: Results of Hmmsearch in A3M format. This provides a list of potential
         template alignments and pdb codes.
       max_template_date: This is used to filter templates for training, ensuring
@@ -610,8 +578,6 @@ class Templates:
           min_hit_length=filter_config.min_hit_length,
           deduplicate_sequences=filter_config.deduplicate_sequences,
           max_hits=filter_config.max_hits,
-          query_chain_id = query_chain_id,
-          identity_treshold= identity_threshold
       )
 
     return Templates(
