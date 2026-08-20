@@ -68,8 +68,23 @@ logs_path="${logs_path%/*}"
 logs_path="${logs_path%/*}/logs/"
 
 mkdir -p "${logs_path}/"
-logs_path_datageneration="${logs_path}/af3_datageneration_workflow${suffix_output_datagen}/"      
-logs_path_inference="${logs_path}/af3_inference${suffix_output_inference}/"
+
+##Old behaviour: data-generation/inference redirected logs also lived two levels up from
+##DATA_DIR (sibling of the "examples" folder, same place as metrics/the top-level exec below).
+##Kept here for reference/rollback.
+#logs_path_datageneration="${logs_path}/af3_datageneration_workflow${suffix_output_datagen}/"
+#logs_path_inference="${logs_path}/af3_inference${suffix_output_inference}/"
+
+#Redirected (per-task, internal `exec`) logs for data-generation/inference now live inside
+#DATA_DIR's parent folder instead, e.g. examples/logs/af3_datageneration_workflow/...
+logs_path_datageneration="${logs_path_inside}/af3_datageneration_workflow${suffix_output_datagen}/"
+logs_path_inference="${logs_path_inside}/af3_inference${suffix_output_inference}/"
+
+#SLURM-level --output/--error logs for data-generation/inference/metrics — next to workflow.sh
+logs_path_slurm="${src}/logs"
+mkdir -p "${logs_path_slurm}"
+logs_path_datageneration_slurm="${logs_path_slurm}/af3_datageneration_workflow${suffix_output_datagen}/"
+logs_path_inference_slurm="${logs_path_slurm}/af3_inference${suffix_output_inference}/"
 
 ##Redirect log
 name_log="${DATA_DIR%/*}"
@@ -98,8 +113,6 @@ if $RUN_DATA_GENERATION_PIPELINE; then
     TOTAL_TASKS_DATA=$(max_array_task_id "$ARRAY_MAP_DATA")
     echo "Detected TOTAL_TASKS_DATA=$TOTAL_TASKS_DATA from $ARRAY_MAP_DATA"
 
-    #Combine the TEMPLATE_SELECTION_METHOD and MSA_TYPE into arrays for iteration
-    read -r -a msa_combinations <<< "${MSA_TYPE:-unpaired}"
     read -r -a combinations <<< "${TEMPLATE_SELECTION_METHOD:-onquery}"
 
     for m in "${combinations[@]}"; do
@@ -109,22 +122,12 @@ if $RUN_DATA_GENERATION_PIPELINE; then
         fi
     done
 
-    for m in "${msa_combinations[@]}"; do
-        if [[ "$m" != "unpaired" && "$m" != "paired" && "$m" != "full" ]]; then
-            echo "ERROR: invalid MSA_TYPE value '$m' — only 'unpaired', 'paired', and 'full' are supported" >&2
-            exit 1
-        fi
-    done
-
-    for msa_type in "${msa_combinations[@]}"; do
-
-
     for template_selection_method in "${combinations[@]}"; do
-    
-        output_folder="${output_datageneration}/msa_${msa_type}_template_${template_selection_method}"
-        echo "Running AF data generation step with MSA type ${msa_type} and template selection method ${template_selection_method}. Results will be saved in $output_folder"
+        output_folder="${output_datageneration}/template_${template_selection_method}"
+        echo "Running AF data generation step with template selection method ${template_selection_method}. Results will be saved in $output_folder"
 
         mkdir -p "$logs_path_datageneration"
+        mkdir -p "$logs_path_datageneration_slurm"
         max_array=1000
 
         for start in $(seq $GLOBAL_START $max_array $TOTAL_TASKS_DATA); do
@@ -132,20 +135,18 @@ if $RUN_DATA_GENERATION_PIPELINE; then
             [ $end -gt $TOTAL_TASKS_DATA ] && end=$TOTAL_TASKS_DATA
 
             array_length=$((${end} - ${start} + 1))
-            echo "Submitting array: $start-$end%$CONCURRENT (length $array_length) for MSA type: $msa_type, template selection method: $template_selection_method"
+            echo "Submitting array: $start-$end%$CONCURRENT (length $array_length) for template selection method: $template_selection_method"
 
             jobid=$(sbatch --parsable --wait \
             --array=1-${array_length}%${CONCURRENT} \
-            --output="${logs_path_datageneration}/slurm_%A_%a.out" \
-            --error="${logs_path_datageneration}/slurm_%A_%a.err" \
+            --output="${logs_path_datageneration_slurm}/slurm_%A_%a.out" \
+            --error="${logs_path_datageneration_slurm}/slurm_%A_%a.err" \
             src/NetTCRfold/runAF3_dataGeneration.sh \
-            $ARRAY_MAP_DATA $input_basejson/"json_msa_template" $output_folder "${logs_path_inside}/af3_datageneration_workflow${suffix_output_datagen}/" \
-            $msa_type $template_selection_method $start)
+            $ARRAY_MAP_DATA $input_basejson/"json_msa_template" $output_folder "$logs_path_datageneration" \
+            $template_selection_method $start)
 
             echo "Job $jobid finished."
         done
-
-    done
     done
 else
     echo "Skipping AF3 data generation step"
@@ -181,6 +182,7 @@ if $RUN_AF3_INFERENCE; then
     fi
 
     mkdir -p "$logs_path_inference"
+    mkdir -p "$logs_path_inference_slurm"
     for folder in $folders; do
         folder_path="$output_customjson/$folder"
         max_array=1000
@@ -193,8 +195,8 @@ if $RUN_AF3_INFERENCE; then
 
             jobid=$(sbatch --parsable --wait \
             --array=1-${array_length}%${CONCURRENT_INFERENCE} \
-            --output="${logs_path_inference}/slurm_%A_%a.out" \
-            --error="${logs_path_inference}/slurm_%A_%a.err" \
+            --output="${logs_path_inference_slurm}/slurm_%A_%a.out" \
+            --error="${logs_path_inference_slurm}/slurm_%A_%a.err" \
             src/NetTCRfold/runAF3inference.sh \
             "$folder_path" "$output_inference" "$logs_path_inference" \
             "$ARRAY_MAP_INFERENCE" "$NUM_SEEDS" "$NUM_DIFFUSION" "$start")
@@ -207,8 +209,6 @@ if $RUN_AF3_INFERENCE; then
 else 
     echo "Skipping AF3 inference step"
 fi
-
-##3. Collect metrics
 
 if $RUN_METRICS_COLLECTION; then
 
@@ -259,12 +259,14 @@ if $RUN_METRICS_COLLECTION; then
             suffix="${suffixes[$i]}"
             metrics_logs="${logs_path}/af3_metrics${suffix_output_inference}/${folder}${suffix}"
             mkdir -p "$metrics_logs"
+            metrics_logs_slurm="${logs_path_slurm}/af3_metrics${suffix_output_inference}/${folder}${suffix}"
+            mkdir -p "$metrics_logs_slurm"
 
             echo "Submitting metrics collection array job for $folder (suffix=$suffix): $NUM_METRIC_SPLITS splits, %${CONCURRENT_METRICS} concurrent"
             jobid=$(sbatch --parsable --wait \
                 --array=0-$((NUM_METRIC_SPLITS - 1))%${CONCURRENT_METRICS} \
-                --output="${metrics_logs}/slurm_%A_%a.out" \
-                --error="${metrics_logs}/slurm_%A_%a.err" \
+                --output="${metrics_logs_slurm}/slurm_%A_%a.out" \
+                --error="${metrics_logs_slurm}/slurm_%A_%a.err" \
                 src/NetTCRfold/collect_metrics_slurm_parallel.sh \
                 "$folder_path" "$suffix" "$NUM_METRIC_SPLITS" "$metrics_logs")
             echo "Job $jobid for metrics collection ($folder, suffix=$suffix) finished."
@@ -288,7 +290,6 @@ if $RUN_METRICS_COLLECTION; then
 else
     echo "Skipping metrics collection"
 
-    
 fi
 
 echo "Pipeline completed"

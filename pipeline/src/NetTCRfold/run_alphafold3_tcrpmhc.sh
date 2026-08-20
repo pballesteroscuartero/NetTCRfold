@@ -11,24 +11,12 @@ export AF3_INPUTDIR=$1
 export AF3_OUTPUTDIR=$2
 export DATA_PIPELINE=$3
 export INFERENCE=$4
-export msa_type="${5:-unpaired}"
-export template_mode="${6:-standard}"
-export NUM_SEEDS="${7:-1}"
-export NUM_DIFFUSION="${8:-5}"
+export template_mode="${5:-standard}"
+export NUM_SEEDS="${6:-1}"
+export NUM_DIFFUSION="${7:-5}"
 
-MSA_ARG=()
 TEMPLATE_ARG=()
 SEED_ARG=()
-
-case "$msa_type" in
-    unpaired) MSA_ARG+=(--unpaired_msa_only) ;;
-    paired)   MSA_ARG+=(--paired_msa_only) ;;
-    full)     ;;
-    *)
-        echo "ERROR: invalid msa_type '$msa_type' — only 'unpaired', 'paired', and 'full' are supported" >&2
-        exit 1
-        ;;
-esac
 
 if [ "$template_mode" = "onquery" ]; then
     TEMPLATE_ARG+=(--only_query_for_template)
@@ -65,5 +53,4 @@ apptainer exec \
      --run_inference=$INFERENCE \
      --num_diffusion_samples=$NUM_DIFFUSION \
      "${SEED_ARG[@]}" \
-     "${MSA_ARG[@]}" \
      "${TEMPLATE_ARG[@]}"

@@ -27,10 +27,6 @@ TEMPLATE_INPUT_SUBFOLDER = {
     "standard": "template_standard",
 }
 
-#MSA types the data-generation step (step 2) can be run with. "full" computes both
-#unpairedMsa and pairedMsa; "unpaired"/"paired" skip searching for the other type entirely.
-DATAGEN_MSA_TYPES = ("unpaired", "paired", "full")
-
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -38,7 +34,7 @@ def parse_args() -> argparse.Namespace:
         "--input",
         type=Path,
         required=True,
-        help="Path to the data-generation output (parent of msa_{unpaired,paired,full}_template_{onquery,standard})",
+        help="Path to the data-generation output (parent of template_onquery/template_standard)",
     )
     parser.add_argument(
         "-d",
@@ -77,46 +73,20 @@ def parse_combination(combo: str) -> tuple[str, str]:
     return parts[0], parts[1]
 
 
-def resolve_source_folder(input_dir: Path, msa_mode: str, template_mode: str) -> tuple[Path, set[str]]:
-    """Finds the data-generation output folder to build a <msaMode>_<templateMode>
-    combination from, and the MSA field(s) that still need to be nulled out of it.
-
-    Data-generation folders are named "msa_<unpaired|paired|full>_<template_onquery|template_standard>".
-    An exact <msa_mode> match is preferred — that data was generated with exactly the requested
-    MSA type (possibly because the other type was never searched for at all), so nothing needs
-    blanking. If none exists, falls back to a "msa_full_" folder and nulls the unwanted field(s),
-    which lets several MSA/template combinations be reconstructed from one data-generation run
-    without rerunning alignments for each of them.
-    """
-    template_candidates = (
-        list(TEMPLATE_INPUT_SUBFOLDER.values())
-        if template_mode == "no"
-        else [TEMPLATE_INPUT_SUBFOLDER[template_mode]]
-    )
-
-    if msa_mode != "no":
-        for template_folder in template_candidates:
-            folder = input_dir / f"msa_{msa_mode}_{template_folder}"
-            if folder.is_dir():
-                return folder, set()
-
-    for template_folder in template_candidates:
-        folder = input_dir / f"msa_full_{template_folder}"
+def resolve_template_folder(input_dir: Path, template_mode: str) -> Path:
+    if template_mode in TEMPLATE_INPUT_SUBFOLDER:
+        folder = input_dir / TEMPLATE_INPUT_SUBFOLDER[template_mode]
+        if not folder.is_dir():
+            raise FileNotFoundError(f"Expected data-generation output folder not found: {folder}")
+        return folder
+    # template_mode == "no": templates get nulled regardless, so any available folder works
+    for candidate in (TEMPLATE_INPUT_SUBFOLDER["onquery"], TEMPLATE_INPUT_SUBFOLDER["standard"]):
+        folder = input_dir / candidate
         if folder.is_dir():
-            return folder, MSA_NULL_FIELDS[msa_mode]
-
-    if msa_mode == "no":
-        # Both MSA fields get nulled regardless, so any available MSA type works.
-        for template_folder in template_candidates:
-            for msa_type in DATAGEN_MSA_TYPES:
-                folder = input_dir / f"msa_{msa_type}_{template_folder}"
-                if folder.is_dir():
-                    return folder, MSA_NULL_FIELDS["no"]
-
-    looked_for = [f"msa_{m}_{t}" for t in template_candidates for m in DATAGEN_MSA_TYPES]
+            return folder
     raise FileNotFoundError(
-        f"No data-generation output folder found under {input_dir} for msaMode='{msa_mode}', "
-        f"templateMode='{template_mode}' (looked for: {', '.join(looked_for)})"
+        f"No data-generation output folder found under {input_dir} "
+        f"(looked for {TEMPLATE_INPUT_SUBFOLDER['onquery']} and {TEMPLATE_INPUT_SUBFOLDER['standard']})"
     )
 
 
@@ -209,7 +179,8 @@ def main():
     print(f"Computing reconstruction for {len(parsed_combos)} combinations: {', '.join(combo for combo, _, _ in parsed_combos)}")
 
     for combo, msa_mode, template_mode in parsed_combos:
-        folder, null_fields = resolve_source_folder(input_dir, msa_mode, template_mode)
+        folder = resolve_template_folder(input_dir, template_mode)
+        null_fields = MSA_NULL_FIELDS[msa_mode]
         null_templates = template_mode == "no"
         folder_name = f"json_{msa_mode}MSA_{template_mode}Template"
 
