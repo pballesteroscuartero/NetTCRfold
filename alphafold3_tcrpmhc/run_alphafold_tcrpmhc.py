@@ -92,19 +92,6 @@ _RUN_INFERENCE = flags.DEFINE_bool(
     True,
     'Whether to run inference on the fold inputs.',
 )
-
-_UNPAIRED_MSA_ONLY = flags.DEFINE_bool(
-    'unpaired_msa_only',
-    False,
-    'Whether to only use the unpaired MSA for each chain.',
-)
-
-_PAIRED_MSA_ONLY = flags.DEFINE_bool(
-    'paired_msa_only',
-    False,
-    'Whether to only use the paired MSA for each chain.',
-)
-
 _ONLY_QUERY_FOR_TEMPLATE = flags.DEFINE_bool(
     'only_query_for_template',
     False,
@@ -796,8 +783,6 @@ def main(_):
         jackhmmer_n_cpu=_JACKHMMER_N_CPU.value,
         nhmmer_n_cpu=_NHMMER_N_CPU.value,
         max_template_date=max_template_date,
-        unpaired_msa_only=_UNPAIRED_MSA_ONLY.value,
-        paired_msa_only=_PAIRED_MSA_ONLY.value,
         only_query_for_template=_ONLY_QUERY_FOR_TEMPLATE.value,
     )
   else:

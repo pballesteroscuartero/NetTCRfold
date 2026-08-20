@@ -87,8 +87,6 @@ def _get_protein_msa_and_templates(
     templates_config: msa_config.TemplatesConfig,
     pdb_database_path: str,
     only_query_for_template: bool = False,
-    unpaired_msa_only: bool = False,
-    paired_msa_only: bool = False,
 ) -> tuple[msa.Msa, msa.Msa, templates_lib.Templates]:
     """Processes a single protein chain."""
     logging.info('Getting protein MSAs for sequence %s', sequence)
@@ -97,54 +95,37 @@ def _get_protein_msa_and_templates(
     # they're not blocked by the GIL, as they're sub-shelled out.
     with futures.ThreadPoolExecutor(max_workers=4) as executor:
 
-        if paired_msa_only:
-           uniref90_msa_future = ""
-           mgnify_msa_future = ""
-           small_bfd_msa_future = ""
-        else:
-            uniref90_msa_future = executor.submit(
-                msa.get_msa,
-                target_sequence=sequence,
-                run_config=uniref90_msa_config,
-                chain_poly_type=mmcif_names.PROTEIN_CHAIN,
-            )
-            mgnify_msa_future = executor.submit(
-                msa.get_msa,
-                target_sequence=sequence,
-                run_config=mgnify_msa_config,
-                chain_poly_type=mmcif_names.PROTEIN_CHAIN,
-            )
-            small_bfd_msa_future = executor.submit(
-                msa.get_msa,
-                target_sequence=sequence,
-                run_config=small_bfd_msa_config,
-                chain_poly_type=mmcif_names.PROTEIN_CHAIN,
-            )
+        uniref90_msa_future = executor.submit(
+            msa.get_msa,
+            target_sequence=sequence,
+            run_config=uniref90_msa_config,
+            chain_poly_type=mmcif_names.PROTEIN_CHAIN,
+        )
+        mgnify_msa_future = executor.submit(
+            msa.get_msa,
+            target_sequence=sequence,
+            run_config=mgnify_msa_config,
+            chain_poly_type=mmcif_names.PROTEIN_CHAIN,
+        )
+        small_bfd_msa_future = executor.submit(
+            msa.get_msa,
+            target_sequence=sequence,
+            run_config=small_bfd_msa_config,
+            chain_poly_type=mmcif_names.PROTEIN_CHAIN,
+        )
 
-        if unpaired_msa_only:
-            uniprot_msa_future = ""
-        else:
-            uniprot_msa_future = executor.submit(
-                msa.get_msa,
-                target_sequence=sequence,
-                run_config=uniprot_msa_config,
-                chain_poly_type=mmcif_names.PROTEIN_CHAIN,
-            )
+        uniprot_msa_future = executor.submit(
+            msa.get_msa,
+            target_sequence=sequence,
+            run_config=uniprot_msa_config,
+            chain_poly_type=mmcif_names.PROTEIN_CHAIN,
+        )
             
-    if paired_msa_only:
-        uniref90_msa = ""
-        mgnify_msa = ""
-        small_bfd_msa = ""
-    else:
-        uniref90_msa = uniref90_msa_future.result()
-        mgnify_msa = mgnify_msa_future.result()
-        small_bfd_msa = small_bfd_msa_future.result()
-
-    if unpaired_msa_only:
-        uniprot_msa = ""
-    else:
-        uniprot_msa = uniprot_msa_future.result()
-
+    
+    uniref90_msa = uniref90_msa_future.result()
+    mgnify_msa = mgnify_msa_future.result()
+    small_bfd_msa = small_bfd_msa_future.result()
+    uniprot_msa = uniprot_msa_future.result()
 
     logging.info(
         'Getting protein MSAs took %.2f seconds for sequence %s',
@@ -155,65 +136,26 @@ def _get_protein_msa_and_templates(
     logging.info('Deduplicating MSAs for sequence %s', sequence)
     msa_dedupe_start_time = time.time()
     with futures.ThreadPoolExecutor() as executor:
-        if unpaired_msa_only:
-            logging.info('Only using unpaired MSA for sequence %s', sequence)
-            unpaired_protein_msa_future = executor.submit(
-                msa.Msa.from_multiple_msas,
-                msas=[uniref90_msa, small_bfd_msa, mgnify_msa],
-                deduplicate=True,
-            )
-            paired_protein_msa = ""
-        elif paired_msa_only:
-            logging.info('Only using paired MSA for sequence %s', sequence)
-            unpaired_protein_msa = ""
-            paired_protein_msa_future = executor.submit(
-                msa.Msa.from_multiple_msas, msas=[uniprot_msa], deduplicate=False
-            )
-        else:  
-            unpaired_protein_msa_future = executor.submit(
-                msa.Msa.from_multiple_msas,
-                msas=[uniref90_msa, small_bfd_msa, mgnify_msa],
-                deduplicate=True,
-            )
-            paired_protein_msa_future = executor.submit(
-                msa.Msa.from_multiple_msas, msas=[uniprot_msa], deduplicate=False
-            )
+        unpaired_protein_msa_future = executor.submit(
+            msa.Msa.from_multiple_msas,
+            msas=[uniref90_msa, small_bfd_msa, mgnify_msa],
+            deduplicate=True,
+        )
+        paired_protein_msa_future = executor.submit(
+            msa.Msa.from_multiple_msas, msas=[uniprot_msa], deduplicate=False
+        )
 
+    
     unpaired_protein_msa = unpaired_protein_msa_future.result()
-
-    if unpaired_msa_only:
-        unpaired_protein_msa = unpaired_protein_msa_future.result()
-        paired_protein_msa = ""
-        logging.info(
-        'Deduplicating MSAs took %.2f seconds for sequence %s, found %d unpaired'
-        ' sequences, %d paired sequences',
-        time.time() - msa_dedupe_start_time,
-        sequence,
-        unpaired_protein_msa.depth,
-        len(paired_protein_msa),
+    paired_protein_msa = paired_protein_msa_future.result()
+    logging.info(
+    'Deduplicating MSAs took %.2f seconds for sequence %s, found %d unpaired'
+    ' sequences, %d paired sequences',
+    time.time() - msa_dedupe_start_time,
+    sequence,
+    unpaired_protein_msa.depth,
+    paired_protein_msa.depth,
     )
-    elif paired_msa_only:
-        unpaired_protein_msa = ""
-        paired_protein_msa = paired_protein_msa_future.result()
-        logging.info(
-        'Deduplicating MSAs took %.2f seconds for sequence %s, found %d unpaired'
-        ' sequences, %d paired sequences',
-        time.time() - msa_dedupe_start_time,
-        sequence,
-        len(unpaired_protein_msa),
-        paired_protein_msa.depth,
-     )
-    else:
-        unpaired_protein_msa = unpaired_protein_msa_future.result()
-        paired_protein_msa = paired_protein_msa_future.result()
-        logging.info(
-        'Deduplicating MSAs took %.2f seconds for sequence %s, found %d unpaired'
-        ' sequences, %d paired sequences',
-        time.time() - msa_dedupe_start_time,
-        sequence,
-        unpaired_protein_msa.depth,
-        paired_protein_msa.depth,
-     )
 
     protein_templates = _get_protein_templates(
         sequence=sequence,
@@ -326,8 +268,6 @@ class DataPipelineConfig:
       parallel. If None, one Nhmmer instance will be run per shard. Only
       applicable if the database is sharded.
     max_template_date: The latest date of templates to use.
-    unpaired_msa_only: Whether to only use the unpaired MSA for each chain. If False, both unpaired and paired MSAs are used (if paired MSA is available).
-    paired_msa_only: Whether to only use the paired MSA for each chain. If False, both unpaired and paired MSAs are used (if unpaired MSA is available).
     only_query_for_template: Whether to only use the query sequence for template search. If False, the whole MSA is used
   """
 
@@ -367,8 +307,6 @@ class DataPipelineConfig:
   max_template_date: datetime.date
 
   ##New arguments
-  unpaired_msa_only: bool = False
-  paired_msa_only: bool = False
   only_query_for_template: bool = False
 
 
@@ -538,8 +476,6 @@ class DataPipeline:
     self._pdb_database_path = data_pipeline_config.pdb_database_path
 
     ##New arguments
-    self.unpaired_msa_only = data_pipeline_config.unpaired_msa_only
-    self.paired_msa_only = data_pipeline_config.paired_msa_only
     self.only_query_for_template = data_pipeline_config.only_query_for_template
     
 
@@ -563,29 +499,12 @@ class DataPipeline:
             templates_config=self._templates_config,
             pdb_database_path=self._pdb_database_path,
             only_query_for_template = self.only_query_for_template,
-            unpaired_msa_only = self.unpaired_msa_only,
-            paired_msa_only = self.paired_msa_only,
         )
 
-        if not self.unpaired_msa_only:
-            unpaired_msa = unpaired_msa.to_a3m()
-            paired_msa = paired_msa.to_a3m()
-        else:
-           unpaired_msa = unpaired_msa.to_a3m()
-           paired_msa = msa.Msa.from_empty(
-          query_sequence=chain.sequence,
-          chain_poly_type=mmcif_names.PROTEIN_CHAIN,).to_a3m()
-
-        if not self.paired_msa_only:
-            unpaired_msa = unpaired_msa.to_a3m()
-            paired_msa = paired_msa.to_a3m()
-        else:
-            paired_msa = paired_msa.to_a3m()
-            unpaired_msa = msa.Msa.from_empty(
-          query_sequence=chain.sequence,
-          chain_poly_type=mmcif_names.PROTEIN_CHAIN,).to_a3m()
-
- 
+       
+        unpaired_msa = unpaired_msa.to_a3m()
+        paired_msa = paired_msa.to_a3m()
+        
         templates = [
             folding_input.Template(
                 mmcif=struc.to_mmcif(),
