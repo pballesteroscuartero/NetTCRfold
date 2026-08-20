@@ -185,7 +185,7 @@ _PDB_DATABASE_PATH = flags.DEFINE_string(
 )
 _SEQRES_DATABASE_PATH = flags.DEFINE_string(
     'seqres_database_path',
-    '${DB_DIR}/pdb_seqres_tcrpmhc_iedb_mhc_tcr_stcrdab_abTCR_onlyMHCbound.txt',
+    '${DB_DIR}/pdb_seqres_tcrpmhc.txt',
     'PDB sequence database path, used for template search.',
 )
 
