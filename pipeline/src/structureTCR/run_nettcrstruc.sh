@@ -8,8 +8,9 @@
 #SBATCH --mem=64G
 #SBATCH --time=36:00:00
 #SBATCH --nodelist=compute02,compute03,compute04,compute05
-#SBATCH --output=/home/projects2/pbacu/projects/structureTCR/structurePipeline/logs/nettcrstruc/slurm_%A_%a.out
-#SBATCH --error=/home/projects2/pbacu/projects/structureTCR/structurePipeline/logs/nettcrstruc/slurm_%A_%a.err
+#Fallback path for standalone submission; workflow.sh overrides these via sbatch --output/--error
+#SBATCH --output=logs/nettcrstruc/slurm_%A_%a.out
+#SBATCH --error=logs/nettcrstruc/slurm_%A_%a.err
 
 #Usage example: sbatch run_nettcrstruc.sh ../../data/nettcrstruc/rerank_input/inputModels
 

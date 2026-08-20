@@ -6,11 +6,9 @@
 #SBATCH --mem=500MB
 #SBATCH --time=48:00:00
 #SBATCH --nodelist=compute02,compute03,compute04,compute05
-#SBATCH --output=/home/projects2/pbacu/projects/NetTCRfold/logs/af3_datageneration_workflow/smalldb/slurm_%A_%a.out
-#SBATCH --error=/home/projects2/pbacu/projects/NetTCRfold/logs/af3_datageneration_workflow/smalldb/slurm_%A_%a.err
-
-#For afbenchmark array 25, for schumacher array 603, for nettcr array 13956
-#Usage example: sbatch runAF3_dataGeneration.sh 
+#Fallback path for standalone submission; workflow.sh overrides these via sbatch --output/--error
+#SBATCH --output=logs/af3_datageneration_workflow/slurm_%A_%a.out
+#SBATCH --error=logs/af3_datageneration_workflow/slurm_%A_%a.err
 
 config=$1
 json_path=$2

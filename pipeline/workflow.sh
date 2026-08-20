@@ -5,8 +5,9 @@
 #SBATCH --cpus-per-task=5
 #SBATCH --mem=64G
 #SBATCH --time=250:00:00
-#SBATCH --output=/home/projects2/pbacu/projects/NetTCRfold/logs/slurm_%A_%a.out
-#SBATCH --error=/home/projects2/pbacu/projects/NetTCRfold/logs/slurm_%A_%a.err
+#Submit from the pipeline/ directory; SLURM needs this to exist beforehand: mkdir -p logs
+#SBATCH --output=logs/slurm_%A_%a.out
+#SBATCH --error=logs/slurm_%A_%a.err
 #--nodelist=compute02,compute03,compute04,compute05,compute06
 
 #Strict execution mode
@@ -119,6 +120,7 @@ if $RUN_DATA_GENERATION_PIPELINE; then
         output_folder="${output_datageneration}/msa_${msa_type}_template_${template_selection_method}"
         echo "Running AF data generation step with MSA type ${msa_type} and template selection method ${template_selection_method}. Results will be saved in $output_folder"
 
+        mkdir -p "$logs_path_datageneration"
         max_array=1000
 
         for start in $(seq $GLOBAL_START $max_array $TOTAL_TASKS_DATA); do
@@ -130,6 +132,8 @@ if $RUN_DATA_GENERATION_PIPELINE; then
 
             jobid=$(sbatch --parsable --wait \
             --array=1-${array_length}%${CONCURRENT} \
+            --output="${logs_path_datageneration}/slurm_%A_%a.out" \
+            --error="${logs_path_datageneration}/slurm_%A_%a.err" \
             src/structureTCR/runAF3_dataGeneration.sh \
             $ARRAY_MAP_DATA $input_basejson/"json_msa_template" $output_folder $logs_path_datageneration \
             $msa_type $template_selection_method $start)
@@ -172,9 +176,10 @@ if $RUN_AF3_INFERENCE; then
         echo "Using folders from config: $folders"
     fi
 
+    mkdir -p "$logs_path_inference"
     for folder in $folders; do
         folder_path="$output_customjson/$folder"
-        max_array=1000 
+        max_array=1000
         for start in $(seq $GLOBAL_START $max_array $TOTAL_TASKS_INFERENCE); do
             end=$((${start} + ${max_array} - 1))
             [ $end -gt $TOTAL_TASKS_INFERENCE ] && end=$TOTAL_TASKS_INFERENCE
@@ -184,6 +189,8 @@ if $RUN_AF3_INFERENCE; then
 
             jobid=$(sbatch --parsable --wait \
             --array=1-${array_length}%${CONCURRENT_INFERENCE} \
+            --output="${logs_path_inference}/slurm_%A_%a.out" \
+            --error="${logs_path_inference}/slurm_%A_%a.err" \
             src/structureTCR/runAF3inference.sh \
             "$folder_path" "$output_inference" "$logs_path_inference" \
             "$ARRAY_MAP_INFERENCE" "$NUM_SEEDS" "$NUM_DIFFUSION" "$start")
@@ -252,6 +259,8 @@ if $RUN_METRICS_COLLECTION; then
             echo "Submitting metrics collection array job for $folder (suffix=$suffix): $NUM_METRIC_SPLITS splits, %${CONCURRENT_METRICS} concurrent"
             jobid=$(sbatch --parsable --wait \
                 --array=0-$((NUM_METRIC_SPLITS - 1))%${CONCURRENT_METRICS} \
+                --output="${metrics_logs}/slurm_%A_%a.out" \
+                --error="${metrics_logs}/slurm_%A_%a.err" \
                 src/structureTCR/collect_metrics_slurm_parallel.sh \
                 "$folder_path" "$suffix" "$NUM_METRIC_SPLITS" "$metrics_logs")
             echo "Job $jobid for metrics collection ($folder, suffix=$suffix) finished."
@@ -331,8 +340,11 @@ if $COMPUTE_NETTCRSTRUC; then
     fi
     num_folders=${#folders_nettcrstruc[@]}
     echo "Submitting netttcrstruct for $num_folders folders"
-    #jobid=$(sbatch --parsable --wait --array=1-${num_folders}%1 scripts/run_nettcrstruc.sh "$output_nettcrstruct_datareformatting" "$logs_path_nettcrstruct" "$ENSEMBLE" "$suffix_output_inference" "$folders_nettcrstruc_str")
-    jobid=$(sbatch --parsable --wait src/structureTCR/launch_nettcrstruct_parallel.sh "$output_nettcrstruct_datareformatting" "$logs_path_nettcrstruct" "$ENSEMBLE" "$suffix_output_inference" "$folders_nettcrstruc_str")
+    mkdir -p "$logs_path_nettcrstruct"
+    jobid=$(sbatch --parsable --wait \
+        --output="${logs_path_nettcrstruct}/slurm_%j.out" \
+        --error="${logs_path_nettcrstruct}/slurm_%j.err" \
+        src/structureTCR/launch_nettcrstruct_parallel.sh "$output_nettcrstruct_datareformatting" "$logs_path_nettcrstruct" "$ENSEMBLE" "$suffix_output_inference" "$folders_nettcrstruc_str")
     echo "sbatch exit code: $?"
     echo "Job $jobid for nettcrstruct finished."
 else

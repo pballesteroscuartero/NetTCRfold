@@ -3,14 +3,18 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=128G
 #SBATCH --time=150:00:00
-#SBATCH --output=/home/projects2/pbacu/projects/structureTCR/structurePipeline/logs/slurm_%A_%a.out
-#SBATCH --error=/home/projects2/pbacu/projects/structureTCR/structurePipeline/logs/slurm_%A_%a.err
+#Fallback path for standalone submission; workflow.sh overrides these via sbatch --output/--error
+#SBATCH --output=logs/slurm_%A_%a.out
+#SBATCH --error=logs/slurm_%A_%a.err
 
 #Strict execution mode
 set -Eeuo pipefail
 
 #Usage: sbatch --array=0-<num_splits-1>%<concurrency> collect_metrics_slurm_parallel.sh <folder_path> <suffix> <num_splits> <logs_path>
-source /home/projects2/pbacu/utils/Miniconda/etc/profile.d/conda.sh
+#CONDA_SH must be set in the environment (see configs/env.cfg.example); sbatch inherits it
+#from the submitting shell, which sources configs/env.cfg before calling sbatch.
+: "${CONDA_SH:?CONDA_SH is not set — define it in configs/env.cfg (see configs/env.cfg.example)}"
+source "$CONDA_SH"
 conda activate structureTCR
 
 folder_path=$1

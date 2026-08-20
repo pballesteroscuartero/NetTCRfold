@@ -5,8 +5,9 @@
 #SBATCH --cpus-per-task=5
 #SBATCH --mem=10G
 #SBATCH --time=36:00:00
-#SBATCH --output=/home/projects2/pbacu/projects/structureTCR/structurePipeline/logs/nettcrstruc/slurm_%A_%a.out
-#SBATCH --error=/home/projects2/pbacu/projects/structureTCR/structurePipeline/logs/nettcrstruc/slurm_%A_%a.err
+#Fallback path for standalone submission; workflow.sh overrides these via sbatch --output/--error
+#SBATCH --output=logs/nettcrstruc/slurm_%A_%a.out
+#SBATCH --error=logs/nettcrstruc/slurm_%A_%a.err
 
 input_path="${1%/}"
 logs_path=$2
@@ -84,6 +85,8 @@ for folder in "${folders[@]}"; do
         #    "${log_suffix}_${folder}_job${job_id}")
 
         job_id_slurm=$(sbatch --parsable \
+            --output="${logs_path}/slurm_%j_${folder}_job${job_id}.out" \
+            --error="${logs_path}/slurm_%j_${folder}_job${job_id}.err" \
             src/structureTCR/run_nettcrstruc_batch.sh \
             "$split_dir" \
             "$input_path" \

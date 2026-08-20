@@ -7,8 +7,9 @@
 #SBATCH --cpus-per-task=10
 #SBATCH --mem=64G
 #SBATCH --time=150:00:00
-#SBATCH --output=/home/projects2/pbacu/projects/structureTCR/structurePipeline/logs/nettcrstruc/slurm_%A_%a.out
-#SBATCH --error=/home/projects2/pbacu/projects/structureTCR/structurePipeline/logs/nettcrstruc/slurm_%A_%a.err
+#Fallback path for standalone submission; workflow.sh overrides these via sbatch --output/--error
+#SBATCH --output=logs/nettcrstruc/slurm_%A_%a.out
+#SBATCH --error=logs/nettcrstruc/slurm_%A_%a.err
 
 # input_path is a temp dir containing symlinks to this job's assigned subfolders.
 # The container sees it as a normal parent folder and processes all subfolders in it.

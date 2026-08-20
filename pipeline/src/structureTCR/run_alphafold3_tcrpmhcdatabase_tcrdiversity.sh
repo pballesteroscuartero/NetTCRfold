@@ -3,7 +3,6 @@
 : "${AF3_RESOURCES_DIR:?AF3_RESOURCES_DIR is not set — define it in configs/env.cfg (see configs/env.cfg.example)}"
 export AF3_SRC=${AF3_RESOURCES_DIR}
 export AF3_IMAGE=${AF3_IMAGE}
-#export AF3_IMAGE=${AF3_RESOURCES_DIR}/image/alphafold3_tcrpmhc_tcrdivfilt_finalImage_cuda126-py312.sif
 export AF3_MODEL_PARAMETERS_DIR=${AF3_RESOURCES_DIR}/weights
 export AF3_DATABASES_DIR=${AF3_RESOURCES_DIR}/tcrpmhc_databases
 
@@ -12,17 +11,28 @@ export AF3_INPUTDIR=$1
 export AF3_OUTPUTDIR=$2
 export DATA_PIPELINE=$3
 export INFERENCE=$4
-export template_mode="${5:-standard}"
-export NUM_SEEDS="${6:-1}"
-export NUM_DIFFUSION="${7:-5}"
+export msa_type="${5:-unpaired}"
+export template_mode="${6:-standard}"
+export NUM_SEEDS="${7:-1}"
+export NUM_DIFFUSION="${8:-5}"
 
+MSA_ARG=()
 TEMPLATE_ARG=()
 SEED_ARG=()
+
+case "$msa_type" in
+    unpaired) MSA_ARG+=(--unpaired_msa_only) ;;
+    paired)   MSA_ARG+=(--paired_msa_only) ;;
+    full)     ;;
+    *)
+        echo "ERROR: invalid msa_type '$msa_type' — only 'unpaired', 'paired', and 'full' are supported" >&2
+        exit 1
+        ;;
+esac
 
 if [ "$template_mode" = "onquery" ]; then
     TEMPLATE_ARG+=(--only_query_for_template)
 fi
-
 
 if [ "$NUM_SEEDS" -gt 1 ]; then
     SEED_ARG+=(--num_seeds="$NUM_SEEDS")
@@ -55,4 +65,5 @@ apptainer exec \
      --run_inference=$INFERENCE \
      --num_diffusion_samples=$NUM_DIFFUSION \
      "${SEED_ARG[@]}" \
+     "${MSA_ARG[@]}" \
      "${TEMPLATE_ARG[@]}"

@@ -8,8 +8,9 @@
 #SBATCH --mem=35g
 #SBATCH --time=48:00:00
 #SBATCH --nodelist=compute02,compute03,compute04,compute05
-#SBATCH --output=/home/projects2/pbacu/projects/structureTCR/structurePipeline/logs/af3_inference/smalldb/slurm_%A_%a.out
-#SBATCH --error=/home/projects2/pbacu/projects/structureTCR/structurePipeline/logs/af3_inference/smalldb/slurm_%A_%a.err
+#Fallback path for standalone submission; workflow.sh overrides these via sbatch --output/--error
+#SBATCH --output=logs/af3_inference/slurm_%A_%a.out
+#SBATCH --error=logs/af3_inference/slurm_%A_%a.err
 
 export folder_path=$1
 export output_dir=$2
