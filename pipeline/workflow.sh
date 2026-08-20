@@ -206,6 +206,38 @@ else
     echo "Skipping AF3 inference step"
 fi
 
+if $COMPUTE_DOCKQ; then
+    echo "Computing DockQ scores"
+    if [[ -z "${FOLDERS_METRIC_COLLECTION:-}" ]]; then
+        echo "FOLDERS not provided in config — processing all subfolders in $output_inference"
+        folders_dockq=$(find "$output_inference" -mindepth 1 -maxdepth 1 -type d -printf '%f\n')
+        echo "Folders to process: $folders_dockq"
+    else
+        folders_dockq=$FOLDERS_METRIC_COLLECTION
+        echo "Using folders from config. Folders to process: $folders_dockq"
+    fi
+
+    for folder in $folders_dockq; do
+        folder_path="$output_inference/$folder"
+        echo "Computing Dockq for files in $folder"
+        python -m NetTCRfold.metrics.computeDockq \
+            -i "$folder_path" \
+            -t "$TEMPLATE_PATH" \
+            -d "$dockq_repo" \
+            -n1 D E \
+            -m1 D E \
+            -n2 C A \
+            -m2 C A \
+            -s "_dockQonpMHC"
+        echo "Computation for $folder finished."
+        echo "Removing extra pdb files generated"
+        find "$folder_path" -mindepth 3 -maxdepth 3 -type f -name "*.pdb" -delete
+    done
+    echo "DockQ collected for all folders"
+else
+    echo "Skipping DockQ computation"
+fi
+
 if $RUN_METRICS_COLLECTION; then
 
     echo "Collecting metrics step"
@@ -216,27 +248,6 @@ if $RUN_METRICS_COLLECTION; then
     else
         folders_metric_collection=$FOLDERS_METRIC_COLLECTION
         echo "Using folders from config. Folders to process: $folders_metric_collection"
-    fi
-
-    if $COMPUTE_DOCKQ; then
-        echo "Computing DockQ scores"
-        for folder in $folders_metric_collection; do
-            folder_path="$output_inference/$folder"
-            echo "Computing Dockq for files in $folder"
-            python -m NetTCRfold.metrics.computeDockq \
-                -i "$folder_path" \
-                -t "$TEMPLATE_PATH" \
-                -d "$dockq_repo" \
-                -n1 D E \
-                -m1 D E \
-                -n2 C A \
-                -m2 C A \
-                -s "_dockQonpMHC"
-            echo "Computation for $folder finished."
-            echo "Removing extra pdb files generated"
-            find "$folder_path" -mindepth 3 -maxdepth 3 -type f -name "*.pdb" -delete
-        done
-        echo "DockQ collected for all folders"
     fi
 
     echo "Collecting all metrics for AF3 generated structures and combining them in one file"
