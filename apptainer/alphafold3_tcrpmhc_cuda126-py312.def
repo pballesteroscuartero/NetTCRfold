@@ -1,0 +1,85 @@
+Bootstrap: docker
+From: nvidia/cuda:12.6.3-base-ubuntu24.04
+
+
+%files
+    alphafold3_tcrpmhc/src /app/alphafold/src
+    alphafold3_tcrpmhc/requirements.txt /app/alphafold/requirements.txt
+    alphafold3_tcrpmhc/dev-requirements.txt /app/alphafold/dev-requirements.txt
+    alphafold3_tcrpmhc/pyproject.toml /app/alphafold/pyproject.toml
+    alphafold3_tcrpmhc/run_alphafold_tcrpmhc.py /app/alphafold/run_alphafold_tcrpmhc.py
+    alphafold3_tcrpmhc/CMakeLists.txt /app/alphafold/CMakeLists.txt
+    alphafold3_tcrpmhc/LICENSE /app/alphafold/LICENSE
+    alphafold3_tcrpmhc/README.md /app/alphafold/README.md
+    alphafold3_tcrpmhc/OUTPUT_TERMS_OF_USE.md /app/alphafold/OUTPUT_TERMS_OF_USE.md
+    alphafold3_tcrpmhc/WEIGHTS_PROHIBITED_USE_POLICY.md /app/alphafold/WEIGHTS_PROHIBITED_USE_POLICY.md
+    alphafold3_tcrpmhc/WEIGHTS_TERMS_OF_USE.md /app/alphafold/WEIGHTS_TERMS_OF_USE.md
+    apptainer/jackhmmer_seq_limit.patch /hmmer_build/jackhmmer_seq_limit.patch
+
+%environment
+
+    export DEBIAN_FRONTEND=noninteractive
+    export PYTHONUNBUFFERED=1
+
+    # Equivalent of: ENV PATH="/hmmer/bin:/alphafold3_venv/bin:$PATH"
+    export PATH="/hmmer/bin:/alphafold3_venv/bin:${PATH}"
+
+    # XLA environment variables from Dockerfile
+    export XLA_FLAGS="--xla_gpu_enable_triton_gemm=false"
+    export XLA_PYTHON_CLIENT_PREALLOCATE=true
+    export XLA_CLIENT_MEM_FRACTION=0.95
+
+%post
+    set -eux pipefail
+
+    export DEBIAN_FRONTEND=noninteractive
+    ln -fs /usr/share/zoneinfo/UTC /etc/localtime
+
+    # Base deps (same as Dockerfile)
+    apt-get update -qq
+    apt-get install -y -qq --no-install-recommends python3.12 python3-pip python3.12-venv python3.12-dev git wget gcc g++ make zlib1g-dev zstd ca-certificates patch
+
+    rm -rf /var/lib/apt/lists/*
+
+    # Create venv
+    python3 -m venv /alphafold3_venv
+
+    # Upgrade pip inside venv
+    /alphafold3_venv/bin/pip install --no-cache-dir --upgrade pip
+
+    # Install HMMER (download, verify hash, extract, patch, build)
+    mkdir -p /hmmer_build /hmmer
+    wget http://eddylab.org/software/hmmer/hmmer-3.4.tar.gz -O /hmmer_build/hmmer-3.4.tar.gz
+    (cd /hmmer_build && echo "ca70d94fd0cf271bd7063423aabb116d42de533117343a9b27a65c17ff06fbf3  hmmer-3.4.tar.gz" | sha256sum --check)
+    (cd /hmmer_build && tar zxf hmmer-3.4.tar.gz && rm hmmer-3.4.tar.gz)
+
+    # Apply the --seq_limit patch
+    # (patch file should exist at /hmmer_build/jackhmmer_seq_limit.patch via %files)
+    (cd /hmmer_build && patch -p0 < /hmmer_build/jackhmmer_seq_limit.patch)
+
+    # Build/install HMMER
+    (cd /hmmer_build/hmmer-3.4 && ./configure --prefix=/hmmer)
+    (cd /hmmer_build/hmmer-3.4 && make -j"$(nproc)")
+    (cd /hmmer_build/hmmer-3.4 && make install)
+    (cd /hmmer_build/hmmer-3.4/easel && make install)
+    rm -rf /hmmer_build
+
+    # Install AlphaFold 3 python deps + package
+    cd /app/alphafold
+
+    # setuptools (removed in py3.12) + requirements + install package (no deps)
+    /alphafold3_venv/bin/pip install --no-cache-dir setuptools
+    /alphafold3_venv/bin/pip install --no-cache-dir -r dev-requirements.txt
+    /alphafold3_venv/bin/pip install --no-cache-dir biopython
+    /alphafold3_venv/bin/pip install --no-cache-dir --no-deps .
+
+    # Build chemical components database (installed by pip)
+    # Ensure venv is used when running binaries
+    export PATH="/hmmer/bin:/alphafold3_venv/bin:${PATH}"
+    build_data
+
+%runscript
+    # Equivalent of: CMD ["python3", "run_alphafold.py"]
+    # Pass through any CLI args to run_alphafold.py
+    cd /app/alphafold
+    exec python3 run_alphafold.py "$@"

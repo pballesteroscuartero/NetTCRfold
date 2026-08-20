@@ -1,9 +1,35 @@
 ## Installation
 
-conda env create -f structureTCR.yml
+Clone the repository: 
 
+```
+git clone git@github.com:pballesteroscuartero/NetTCRstruc2.git
+cd NetTCRstruc2
+```
 
-## Data format:
+Download the image for running the modified AF3 pipeline from https://services.healthtech.dtu.dk/suppl/immunology/NetTCRaFold-1.0/image link, or create it from the def file provided using the following command **on the repository homepage** (from NetTCRstruc2)
+
+```
+apptainer build --fakeroot apptainer/alphafold3_tcrpmhc_cuda126-py312.sif apptainer/alphafold3_tcrpmhc_cuda126-py312.def
+```
+
+Download the chemical components:
+
+```
+wget -P alphafold3_tcrpmhc/src/alphafold3/constants/converters \
+  https://services.healthtech.dtu.dk/suppl/immunology/NetTCRaFold-1.0/chemicalComponents/ccd.pickle \
+  https://services.healthtech.dtu.dk/suppl/immunology/NetTCRaFold-1.0/chemicalComponents/chemical_component_sets.pickle
+```
+
+Download the databases:
+
+Install the environment for running the pipeline:
+
+```
+conda env create -f pipeline/structureTCR.yml
+```
+
+## Input data format:
 
 Required a csv with the columns:
     - Epitope_aa or peptide containing the peptide that should be modeled
