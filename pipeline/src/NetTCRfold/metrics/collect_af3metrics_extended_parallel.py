@@ -21,6 +21,9 @@ from NetTCRfold.metrics.scoring_utils import is_interface, pae_metrics_perchain_
 from NetTCRfold.metrics.structure_utils import extract_cdrs_from_structure
 from NetTCRfold.metrics.ipsae_function import compute_ipsae
 
+# Must match the -s suffix workflow.sh passes to computeDockq.py.
+DOCKQ_SUFFIX = "_dockQonpMHC"
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
@@ -40,8 +43,18 @@ def parse_args() -> argparse.Namespace:
     )
     return parser.parse_args()
 
+def has_any_dockq(complexes):
+    """Whether any DockQ output exists yet for this folder (short-circuits on the first hit)."""
+    for c in complexes:
+        pdb_id = c.name
+        for m in c.iterdir():
+            if m.is_dir() and (m / f"dockQ_metrics_{pdb_id}_{m.name}{DOCKQ_SUFFIX}.json").exists():
+                return True
+    return False
+
+
 def process_complex(args):
-    c, suffix = args
+    c, has_dockq = args
     pdb_id = c.name
     ranking_scores = pd.read_csv(c / f"{pdb_id}_ranking_scores.csv")
 
@@ -62,18 +75,18 @@ def process_complex(args):
         sample = int(name_split[1].split("-")[-1])
 
         af_confidence = ranking_lookup[(seed, sample)]
-        dockq_path = m / f"dockQ_metrics_{pdb_id}_{model_name}{suffix}.json"
         model_summary_confidences_path = m / f"{pdb_id}_{model_name}_summary_confidences.json"
         model_confidences_path = m / f"{pdb_id}_{model_name}_confidences.json"
         structure_path = m / f"{pdb_id}_{model_name}_model.cif"
 
-        if dockq_path.exists():
-            with open(dockq_path) as f:
-                d = json.load(f)
-                dockq = d["DockQ"]
-        else:
-            print(f"File {dockq_path} does not exist.")
-            dockq = None 
+        dockq = None
+        if has_dockq:
+            dockq_path = m / f"dockQ_metrics_{pdb_id}_{model_name}{DOCKQ_SUFFIX}.json"
+            if dockq_path.exists():
+                with open(dockq_path) as f:
+                    dockq = json.load(f)["DockQ"]
+            else:
+                print(f"No dockQ file found for {pdb_id}/{model_name}.")
 
         with open(model_summary_confidences_path) as f:
             afsumm = json.load(f)
@@ -140,12 +153,13 @@ def main():
     # Partition into num_splits contiguous chunks, this job handles only split_idx
     complexes = complexes[args.split_idx::args.num_splits]
 
-    tasks = [(c, suffix) for c in complexes]
+    has_dockq = has_any_dockq(complexes)
 
     n_workers = 4
     joint_path = input_path / f"collected_af3metrics_split{args.split_idx}{suffix}.csv"
     first_write = True
-    
+
+    tasks = [(c, has_dockq) for c in complexes]
 
     with ProcessPoolExecutor(max_workers=n_workers) as executor:
         futures = [executor.submit(process_complex, task) for task in tasks]

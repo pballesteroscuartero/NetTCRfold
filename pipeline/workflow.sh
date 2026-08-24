@@ -282,6 +282,11 @@ if $RUN_METRICS_COLLECTION; then
         python -m NetTCRfold.metrics.combine_metrics_onefile \
             -i "$output_inference" \
             -s "$suffix"
+
+        echo "Expanding chain-pair metrics for suffix=$suffix"
+        python -m NetTCRfold.metrics.expandMetrics \
+            -i "${output_inference}/allresults_merged${suffix}.csv" \
+            -o "${output_inference}/allresults_merged_expanded${suffix}.csv"
     done
 
 else
