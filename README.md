@@ -40,7 +40,7 @@ conda activate NetTCRfold
 pip install -e .
 ```
 
-7. OPTIONAL: If dockQ wants to be used, clone their original repository and specify in the file configs/env.cfg its path
+##NOTE: DockQ version 1 is provided. It is cloned from the original repository: https://github.com/wallnerlab/DockQ/tree/v1.0 
 
 
 ##TODO. Add somewhere the errors: Make sure to download apptainer - otherwise the following error will be seen when running data processing or inference in the examples/logs/af3_datageneration_workflow/*.err: FATAL:   While checking container encryption: could not open image /imagePath/alphafold3_tcrpmhc_cuda126-py312.sif: failed to retrieve path for /imagePath/alphafold3_tcrpmhc_cuda126-py312.sif: lstat /imagePath/alphafold3_tcrpmhc_cuda126-py312.sif: no such file or directory 
@@ -157,11 +157,16 @@ Say that we have examples here etc and brief explanation of the fields
     -s: Suffic to append to the metric files
     --split_idx: Specific split we are processing
     --num_splits: Total number of splits
+    Note: DockQ is picked up automatically if present on disk (dockQ_metrics_*.json files next to each model), independently of the -s suffix. This means COMPUTE_DOCKQ and RUN_METRICS_COLLECTION can be run in either order/separately: as long as DockQ has been computed at some point for a folder, the dockq column will be populated when metrics are collected for it, even if this particular run has COMPUTE_DOCKQ=false. It will only be empty if no DockQ has been computed yet for that folder.
     Inputs for combine_metrics_onefile.py: Use this code if multiple folders were processed and output should be collapsed into a single file.
         -i: General folder where inference samples are stored i.e: structureInference
         -s: Suffix to append to the file
     Output: A file in the structureInference folder called allresults_merged.csv containing the metrics for all parameter combinations.
-    
-    
+
+    Code: expandMetrics.py. Run after combine_metrics_onefile.py on its output. The per-datapoint metrics are stored as nested per-chain-pair dictionaries (e.g. chain_pair_iptm, chain_pair_pae_min, cdr_metric_mean_chain, ipsae, ipsae_d0chn, ipsae_d0dom); this step flattens them into one column per chain pair (e.g. TRA_TRB_ipsae) so the results can be filtered/plotted without parsing dictionaries.
+    Inputs for expandMetrics.py:
+        -i/--input_csv: Path to the combined metrics file to expand. In the pipeline this is allresults_merged{suffix}.csv, produced by combine_metrics_onefile.py
+        -o/--output_csv: Path to save the expanded csv
+    Output: A file in the structureInference folder called allresults_merged_expanded.csv, with the chain-pair metrics expanded into individual columns instead of nested dictionaries.
 
 
