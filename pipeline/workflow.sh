@@ -21,6 +21,12 @@ conda activate NetTCRfold
 CONFIG_FILE="${1:-configs/config.cfg}"
 source "$CONFIG_FILE"
 
+#Resolve DATA_DIR to an absolute path. The log-path derivation below strips
+#two directory levels off of it; a relative DATA_DIR with too few segments
+#(e.g. "examples/data_minimal/") runs out of levels to strip and silently
+#collapses both log directories into one instead of erroring.
+DATA_DIR="$(cd "$DATA_DIR" && pwd)/"
+
 src=$PROJECT_ROOT
 mhcdb=$src/databases/mhc_sequences
 dockq_repo=$DOCKQ_REPO

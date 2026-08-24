@@ -1,7 +1,5 @@
 # NetTCRfold
 
-## What is this?
-
 NetTCRfold is a pipeline for predicting the 3D structure of T-cell receptor–peptide-MHC (TCR-pMHC) complexes. It consists of a TCR-pMHC-specialized version of AlphaFold3 (the `alphafold3_tcrpmhc` folder in this repository) with the surrounding steps needed to actually use it (the pipeline folder).
 
 In short: 
@@ -93,7 +91,7 @@ To run the pipeline on your own targets, provide a CSV with the columns:
 
 3. Download the image for running the modified AF3 pipeline:
    ```
-   wget -P apptainer \
+   wget -r -np -nH --cut-dirs=4 -R "index.html*" -P apptainer/ \
        https://services.healthtech.dtu.dk/suppl/immunology/NetTCRaFold-1.0/image/
    ```
 

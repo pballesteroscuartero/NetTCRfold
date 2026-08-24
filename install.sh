@@ -16,7 +16,7 @@ echo "and place them inside $SCRIPT_DIR/alphafold3_tcrpmhc (see README.md)."
 echo
 
 echo "== Step 3: AF3 pipeline image =="
-wget -P apptainer \
+wget -r -np -nH --cut-dirs=4 -R "index.html*" -P apptainer/ \
     https://services.healthtech.dtu.dk/suppl/immunology/NetTCRaFold-1.0/image/
 
 echo "== Step 4: Chemical components =="
