@@ -24,23 +24,28 @@ wget -P alphafold3_tcrpmhc/src/alphafold3/constants/converters \
   https://services.healthtech.dtu.dk/suppl/immunology/NetTCRaFold-1.0/chemicalComponents/chemical_component_sets.pickle
 ```
 
-5. Download the curated databases with:
+5. Download the curated databases with: TODO: TEST IT WORKS AS IT SHOULD
 
 ```
-wget -P alphafold3_tcrpmhc ##ADD COMMAND
+wget -r -np -nH --cut-dirs=3 -R "index.html*" -P alphafold3_tcrpmhc/ \
+  https://services.healthtech.dtu.dk/suppl/immunology/NetTCRaFold-1.0/tcrpmhc_databases/
 
 ```
-
 
 6. Install the environment for running the pipeline:
 
 ```
-conda env create -f pipeline/structureTCR.yml
+conda env create -f pipeline/NetTCRfold.yml
+conda activate NetTCRfold
 pip install -e .
 ```
 
 7. OPTIONAL: If dockQ wants to be used, clone their original repository and specify in the file configs/env.cfg its path
 
+
+##TODO. Add somewhere the errors: Make sure to download apptainer - otherwise the following error will be seen when running data processing or inference in the examples/logs/af3_datageneration_workflow/*.err: FATAL:   While checking container encryption: could not open image /imagePath/alphafold3_tcrpmhc_cuda126-py312.sif: failed to retrieve path for /imagePath/alphafold3_tcrpmhc_cuda126-py312.sif: lstat /imagePath/alphafold3_tcrpmhc_cuda126-py312.sif: no such file or directory 
+weights: Make sure to download the weights - otherwise the following error will be seen when running data processing or inference in the examples/logs/af3_datageneration_workflow/*.err: FATAL:   container creation failed: mount hook function failure: mount /pathrepo/alphafold3_tcrpmhc/weights->/mnt/models error: while mounting /pathRepo/weights: mount source /pathRepo/weights doesn't exist
+databases: Make sure to download the tcrpmhc_databases - otherwise the following error will be seen when running data processing or inference in the examples/logs/af3_datageneration_workflow/*.err: FATAL:   container creation failed: mount hook function failure: mount /pathRepo/alphafold3_tcrpmhc/tcrpmhc_databases->/pathRepo/alphafold3_tcrpmhc/tcrpmhc_databases: mount source /pathRepo/alphafold3_tcrpmhc/tcrpmhc_databases doesn't exist
 
 ## Input data format:
 
@@ -117,3 +122,46 @@ Say that we have examples here etc and brief explanation of the fields
         NUM_SEEDS: Number of seeds
         NUM_DIFFUSSION: Number of diffusion samples
         start: Element from samplename_to_array.txt where we start processing
+
+5. COMPUTE_DOCKQ : If there are solved structures available, the pipeline allows the user to compute the DockQ between each model and the solved structure, with respect to the TCR and the peptideMHC complex.
+    Section in config file:
+        TEMPLATE_PATH (required): Points to the folder where the solved-structures templates are stored. The templates should be truncated in the same way as the inputs. And stored under the name: {pdb_id}.trunc.fit.pdb, with pdb_id matching the name by which the models are saved.
+    Code: computeDockq.py
+    Inputs:
+        -i : Input folder path containing all the pdb_ids to process. It's the output of the inference step i.e json_unpairedMSA_onqueryTemplate
+        -t : Template path. Matches the TEMPLATE_PATH in the config file
+        -d : Path to the dockQ repo. It needs to be version 1.0
+        -n1 : Name of the chains to evaluate (TCR) in the native structure
+        -m1 : Name of the chains to evaluate (TCR) in the models
+        -n2: Name to the chains to evaluate (pMHC) in the native structure
+        -m2: Name to the chains to evaluate (pMHC) in the model
+        -s: Suffic to append to the file names
+    Ouput: Saves in each pdb_id/sample_seed folder the dockQ output
+
+6. RUN_METRICS_COLLECTION: Collects a set of metrics for model selection and target selection
+    Section in config file:
+        FOLDERS_METRIC_COLLECTION (optional): Folders to collect the metrics for. If not provided, all the folders present in structInference folder are evaluated. If multiple folders should be passed, provide them as a blank space separated string. I.e: "json_pairedMSA_onqueryTemplate json_unpairedMSA_onqueryTemplate"
+        NUM_METRIC_SPLITS (optional): Number of parallel SLURM array tasks to split metrics collection into. This helps to speed up collection if many datapoints are present. By default set to one.
+        CONCURRENT_METRICS (optional): Maximum concurrent tasks from NUM_METRIC_SPLITS. Set according to your resources. By default set to one.
+    Code: collect_af3metrics_extended_parallel.py called via collect_metrics_slurm_parallel.sh + combine_metrics_onefile.py
+    Inputs for collect_metrics_slurm_parallel.sh (in this order):
+        - folder_path: Path to folder containing the inference. structureInference...
+        - suffix: Suffix to append to the metric files
+        NUM_METRIC_SPLITS: Number of splits when computing the metrics
+        metrics_logs: Path to the log where each of the logs for the splits will be saved
+
+    Outpus: The output of this step is a collection of metrics saved within each folder i.e json_unpairedMSA_onqueryTemplate called "collected_af3metrics.csv" containing all the metrics for each datapoint
+
+    Inputs for collect_af3metrics_extended_parallel.py:
+    -i: Path to the specific folder to evaluate i.e json_unpairedMSA_onqueryTemplate
+    -s: Suffic to append to the metric files
+    --split_idx: Specific split we are processing
+    --num_splits: Total number of splits
+    Inputs for combine_metrics_onefile.py: Use this code if multiple folders were processed and output should be collapsed into a single file.
+        -i: General folder where inference samples are stored i.e: structureInference
+        -s: Suffix to append to the file
+    Output: A file in the structureInference folder called allresults_merged.csv containing the metrics for all parameter combinations.
+    
+    
+
+
