@@ -1,182 +1,215 @@
-## Installation
+# NetTCRfold
 
-1. Clone the repository: 
+## What is this?
 
+NetTCRfold is a pipeline for predicting the 3D structure of T-cell receptor–peptide-MHC (TCR-pMHC) complexes. It consists of a TCR-pMHC-specialized version of AlphaFold3 (the `alphafold3_tcrpmhc` folder in this repository) with the surrounding steps needed to actually use it (the pipeline folder).
+
+In short: 
+It turns a plain CSV of TCR/peptide/MHC sequences into AF3-ready inputs (MSA + template search), it runs structure inference over many datapoints as SLURM array jobs and it scores resulting models with confidence metrics, interface metrics, and (if solved structures are available) DockQ against ground truth.
+
+The whole pipeline is driven by a single entry point, `pipeline/workflow.sh`, controlled by two small config files (`env.cfg` for machine-specific paths, `config.cfg` for what to run and how).
+
+## Installation (quick)
+
+1. Clone the repository:
+   ```
+   git clone git@github.com:pballesteroscuartero/NetTCRfold.git
+   cd NetTCRfold
+   ```
+
+2. Request access to the AF3 weights and place them inside `alphafold3_tcrpmhc/` (manual step — see [Advanced: detailed installation](#advanced-detailed-installation--troubleshooting)).
+
+3. Run the installer, which downloads the AF3 image, chemical components, curated databases, DockQ, and creates the conda environment:
+
+   ```
+   bash install.sh
+   ```
+
+For the full step-by-step breakdown (in case `install.sh` doesn't fit your setup) and common setup errors, see [Advanced: detailed installation](#advanced-detailed-installation--troubleshooting).
+
+## Quickstart: run the minimal example - one datapoint
+
+The repo includes a ready-to-use single-datapoint example (`pipeline/examples/data_minimal/single_target.csv`) and a matching minimal config (`pipeline/configs/configMinimal.cfg`), so you can confirm your install works end to end before pointing the pipeline at your own data.
+
+1. Fill in your machine-specific paths once:
+   ```
+   cp pipeline/configs/envExample.cfg pipeline/configs/env.cfg
+   ```
+   then edit `pipeline/configs/env.cfg` (conda location and repository root — see [env.cfg reference](#envcfg)).
+
+2. Submit the pipeline with the minimal config, from inside `pipeline/` (paths in the config are relative to it):
+   ```
+   cd pipeline
+   sbatch workflow.sh configs/configMinimal.cfg
+   ```
+   `workflow.sh` needs SLURM (it submits its own sub-jobs with `sbatch`), so this has to run on a system with SLURM available, and it must be submitted with `sbatch`, not run directly with `bash`. 
+
+This runs JSON generation, MSA/template generation with the default parameters as defined in our paper (unpaired MSA only and template selection on query), structure inference, and metrics collection (DockQ is off by default in the minimal config — see [configMinimal.cfg](pipeline/configs/configMinimal.cfg)). The final combined, expanded metrics table lands at:
 ```
-git clone git@github.com:pballesteroscuartero/NetTCRfold.git
-cd NetTCRfold
+pipeline/examples/data_minimal/af3_output/structInference/allresults_merged_expanded.csv
 ```
 
-2. Request access to AF3 weights from XXXX and place them inside alphafold3_tcrpmhc folder
+## Pipeline overview
 
---- Run bash install.sh to automatically run the following steps:
+`workflow.sh` runs up to six steps in order, each one turned on/off in `config.cfg`:
 
-3. Download the image for running the modified AF3 pipeline from https://services.healthtech.dtu.dk/suppl/immunology/NetTCRaFold-1.0/image link
+1. **RUN_JSON_WITH_MSA_TEMPLATE_GENERATION** — decompose the input CSV into unique chains and write AF3-format JSON per chain (so shared chains aren't reprocessed).
+2. **RUN_DATA_GENERATION_PIPELINE** — MSA generation and template selection per chain (as SLURM array jobs).
+3. **RUN_CUSTOM_JSON_GENERATION** — recombine chains into complexes with the MSA/template configuration you want to model.
+4. **RUN_AF3_INFERENCE** — run AF3 structure inference on the reconstructed complexes.
+5. **COMPUTE_DOCKQ** — (optional) score each model against a solved structure with DockQ, if you have one.
+6. **RUN_METRICS_COLLECTION** — collect confidence/interface metrics (and DockQ, if available) into one table per folder, then combine and expand them into a single flat CSV across all folders.
 
-```
-wget -P apptainer \
-    https://services.healthtech.dtu.dk/suppl/immunology/NetTCRaFold-1.0/image/
-```
+Because each step reads what the previous one wrote from disk, you can run them independently across separate submissions — e.g. run inference now, come back and run `COMPUTE_DOCKQ` later once you have solved structures, then run `RUN_METRICS_COLLECTION`. Metrics collection automatically picks up DockQ scores whenever they exist on disk, regardless of which run computed them.
 
-4. Download the chemical components from https://services.healthtech.dtu.dk/suppl/immunology/NetTCRaFold-1.0/chemicalComponents and place them in the following path:
+General usage: pick which steps to run and set the relevant fields in a config file (start from `configs/configMinimal.cfg` or `configs/config.cfg`), then `sbatch workflow.sh <path-to-your-config>` from inside `pipeline/`.
 
-```
-wget -P alphafold3_tcrpmhc/src/alphafold3/constants/converters \
-  https://services.healthtech.dtu.dk/suppl/immunology/NetTCRaFold-1.0/chemicalComponents/ccd.pickle \
-  https://services.healthtech.dtu.dk/suppl/immunology/NetTCRaFold-1.0/chemicalComponents/chemical_component_sets.pickle
-```
+## Preparing your own input data
 
-5. Download the curated databases with: TODO: TEST IT WORKS AS IT SHOULD
+To run the pipeline on your own targets, provide a CSV with the columns:
 
-```
-wget -r -np -nH --cut-dirs=3 -R "index.html*" -P alphafold3_tcrpmhc/ \
-  https://services.healthtech.dtu.dk/suppl/immunology/NetTCRaFold-1.0/tcrpmhc_databases/
+- `Epitope_aa` or `peptide`: the peptide to model.
+- `TRA_aa`: TCR alpha chain sequence (we use the variable-domain-trimmed version).
+- `TRB_aa`: TCR beta chain sequence (variable-domain-trimmed).
+- `MHCA_aa` (optional): MHC alpha chain variable domain sequence. If absent, inferred from `allele` below.
+- `allele` (optional): MHC allele, used to look up `MHCA_aa` in the MHC database if not provided directly.
+- `pdb_id` (optional): PDB ID of the datapoint.
+- `A1, A2, A3, B1, B2, B3` (optional): CDR1-3 sequences of chains A/B — used only for naming.
+- `name` (optional): unique identifier per datapoint. Falls back to `pdb_id`, then to `peptide_A1_A2_A3_B1_B2_B3` or `peptide_TRAaa_TRBaa` if not provided.
 
-```
+---
 
-6. Install DockQ and get version 1.0
+# Advanced
 
-```
-git clone git@github.com:wallnerlab/DockQ.git
-cd DockQ
-git checkout 3735c16
-```
+## Advanced: detailed installation & troubleshooting
 
-7. Install the environment for running the pipeline:
+1. Clone the repository:
+   ```
+   git clone git@github.com:pballesteroscuartero/NetTCRfold.git
+   cd NetTCRfold
+   ```
 
-```
-conda env create -f pipeline/NetTCRfold.yml
-conda activate NetTCRfold
-pip install -e .
-```
---- 
+2. Request access to AF3 weights and place them inside the `alphafold3_tcrpmhc` folder.
 
+3. Download the image for running the modified AF3 pipeline:
+   ```
+   wget -P apptainer \
+       https://services.healthtech.dtu.dk/suppl/immunology/NetTCRaFold-1.0/image/
+   ```
 
+4. Download the chemical components:
+   ```
+   wget -P alphafold3_tcrpmhc/src/alphafold3/constants/converters \
+     https://services.healthtech.dtu.dk/suppl/immunology/NetTCRaFold-1.0/chemicalComponents/ccd.pickle \
+     https://services.healthtech.dtu.dk/suppl/immunology/NetTCRaFold-1.0/chemicalComponents/chemical_component_sets.pickle
+   ```
 
-##TODO. Add somewhere the errors: Make sure to download apptainer - otherwise the following error will be seen when running data processing or inference in the examples/logs/af3_datageneration_workflow/*.err: FATAL:   While checking container encryption: could not open image /imagePath/alphafold3_tcrpmhc_cuda126-py312.sif: failed to retrieve path for /imagePath/alphafold3_tcrpmhc_cuda126-py312.sif: lstat /imagePath/alphafold3_tcrpmhc_cuda126-py312.sif: no such file or directory 
-weights: Make sure to download the weights - otherwise the following error will be seen when running data processing or inference in the examples/logs/af3_datageneration_workflow/*.err: FATAL:   container creation failed: mount hook function failure: mount /pathrepo/alphafold3_tcrpmhc/weights->/mnt/models error: while mounting /pathRepo/weights: mount source /pathRepo/weights doesn't exist
-databases: Make sure to download the tcrpmhc_databases - otherwise the following error will be seen when running data processing or inference in the examples/logs/af3_datageneration_workflow/*.err: FATAL:   container creation failed: mount hook function failure: mount /pathRepo/alphafold3_tcrpmhc/tcrpmhc_databases->/pathRepo/alphafold3_tcrpmhc/tcrpmhc_databases: mount source /pathRepo/alphafold3_tcrpmhc/tcrpmhc_databases doesn't exist
+5. Download the curated databases:
+   ```
+   wget -r -np -nH --cut-dirs=3 -R "index.html*" -P alphafold3_tcrpmhc/ \
+     https://services.healthtech.dtu.dk/suppl/immunology/NetTCRaFold-1.0/tcrpmhc_databases/
+   ```
 
-## Input data format:
+6. Install DockQ (version 1.0):
+   ```
+   git clone git@github.com:wallnerlab/DockQ.git
+   cd DockQ
+   git checkout 3735c16
+   ```
 
-Required a csv with the columns:
-    - Epitope_aa or peptide containing the peptide that should be modeled
-    - TRA_aa: Sequence for the TCRA chain. In our case we use the version of the chain trimmed to the variable domain.
-    - TRB_aa: Sequence for the TCRb chain. In our case we use the version of the chain trimmed to the variable domain.
-    - MHCA_aa (optional): Sequence for the MHC alpha chain variable domain. If not present, it will try to be infered from the allele column (see below).
-    - allele (optional): Allele of the MHC. Used to infer MHCA_aa sequence if not present. Will be looked up in the mhc database.
-    - pdb_id (optional): pdb_id of the datapoint. 
-    - A1, A2, A3, B1, B2, B3 (optional): Sequence of the CDRs1-3 from chain A and B. Used only for naming purposes.
-    - name (optional): Unique identifier of each datapoint. If not present, first pdb_id will try to be used as unique identified. If not present, unique identifier will either be peptide_A1_A2_A3_B1_B2_B2 or peptide_TRAaa_TRBaa.
+7. Create the conda environment for running the pipeline (its pip section already installs this package editable, so no separate `pip install -e` is needed):
+   ```
+   conda env create -f pipeline/NetTCRfold.yml
+   conda activate NetTCRfold
+   ```
 
-## Config file and environment file
+`install.sh` runs steps 3-7 automatically (step 2 can't be scripted — it requires manually requesting access).
 
-Say that we have examples here etc and brief explanation of the fields
+### Common setup errors
 
-## Pipeline steps:
+- **Missing apptainer image**: `FATAL: While checking container encryption: could not open image ... .sif: ... no such file or directory` in `examples/logs/af3_datageneration_workflow/*.err` → re-run step 3 above.
+- **Missing weights**: `FATAL: container creation failed: mount hook function failure: mount .../alphafold3_tcrpmhc/weights->/mnt/models error: ... mount source .../weights doesn't exist` → complete step 2 above.
+- **Missing databases**: `FATAL: container creation failed: mount hook function failure: mount .../alphafold3_tcrpmhc/tcrpmhc_databases->... doesn't exist` → re-run step 5 above.
 
-1.  RUN_JSON_WITH_MSA_TEMPLATE_GENERATION: This step prepares the input csv in a format for input in the pipeline's data generation step. It decomposes the input datapoints per chain, so the same chains are not processed twice.
-    Section in config file:
-        DATA_DIR=Base path where the project is contained. The input data should be contained in this folder. The generated data by the pipeline will also appear in subfolders of this base folder.
-        INPUT_FILE=Path to the CSV file
+## Advanced: config file reference
 
-    Code: dataPreprocessing.py.
-    Inputs:
-        - i: Path to the CSV file. The CSV should be in the format (see above).
-        -o: Path to save the preprocessed files
-        -m: MHC database. Will be used to infer allele sequence if sequence not provided under MHCA_aa
-    Outputs:
-        - {input_file}_hla_withid: Input csv with an extra assigned HLA column and unique identifiers for each unique chain in the database.
-        - chainid_to_array.txt: Mapping of unique chain IDs to slurm array indices. This will be used to process data with slurm arrays.
-        - samplename_to_array.txt: Mapping of unique pdb_ids to slurm array indices. This will be used to process data with slurm arrays.
-        - jsonFiles: Folder where AF3 inputs will be stored.
-            - json_msa_template: Folder containing the inputs for the data generation step. One folder per unique chain, containing the information in AF3's required format.
+### env.cfg
 
-2. RUN_DATA_GENERATION_PIPELINE: MSA generation and template selection per chain. In this step, both unpaired and paired MSA are computed. The user can choose which to select in the next step. The input is an AF3 formatted json of each chain and the output is the MSA and template for that datapoint.
-    Section in config file:
-        TEMPLATE_SELECTION_METHOD (optional): Select either onquery or standard to set the template selection method that will take place. If not set onquery will be performed
-        SUFFIX_DATAGEN (optional): Suffix to append to the datafolder. Useful if multiple settings for dataPipeline are used. E.g Different databases used. If not set, no suffix is set.
-        GLOBAL_START (optional): ID from the chain_id_array to start from. Useful if
+Machine/install-specific paths, sourced once at the top of `workflow.sh`. Copy `configs/envExample.cfg` to `configs/env.cfg` and fill in:
 
-    Code: runAF3_dataGeneration.sh
-    Inputs (in this order): 
-        - config: Path to the chain_id_to_array generated in the previous step
-        - json_path:Path to the input json files: json_msa_template generated by the previous step
-        - output_dir: Directory where to save the generated data. By default it will be in DATA_DIR/data/af3_output/dataGenerationPipeline. A suffix to append to the name can be assigned setting SUFFIX_DATAGEN.
-        - logs_path: Path to save the data generation outputs. By default it's in ../DATA_DIR/logs/af3_datageneration_pipeline/
-        - template_selection_method: Which template selection method to be used. Set by TEMPLATE_SELECTION_METHOD in config
-        - start_id: Which chain ID to start processing. Set by GLOBAL_START in config. If not provided set to 1 by deault.
+- `PROJECT_ROOT`: path to this repository.
+- `CONDA_SH`: path to your conda installation's `etc/profile.d/conda.sh` (needed so `workflow.sh` can `conda activate` inside a non-interactive SLURM job).
+- `DOCKQ_REPO`: path to the DockQ v1.0 checkout (step 6 above).
+- `AF3_RESOURCES_DIR`: path to `alphafold3_tcrpmhc` (weights, databases).
+- `AF3_IMAGE`: path to the apptainer `.sif` image.
 
-3. RUN_CUSTOM_JSON_GENERATION: In this step, the desired MSA and template configuration is applied to the data, and the different chains are pooled back together into the original complexes. The output of this step is the data ready to introduce in the af3_inference pipeline.
-    Section in config file: 
-        MSA_TEMPLATE_COMBINATIONS (optional): Provide the combination one needs to generate in the form of msaType_templateType. The options for MSA type are: unpaired, paired, full (use both paired and unpaired MSA) or no (use No MSA). The options for template are onquery (use sequence for template search), standard (use full MSA profile for template search), no (no template). Options are provided in a string separated by a space. If no options are provided, unpaired_onquery is performed.
-    Code: create_custom_json.py
-    Inputs:
-        - i: Input folder for the reconstruction. The folder named dataPipelineOut{suffix}.
-        - o: General folder to save the reconstructed json files. In the pipeline it's set to DATA_DIR/jsonFiles/customJSON
-        -d Path for the file created in step 1 containing the unique ID per datapoint {input_file}_hla_withid
-        -c combinations string to reconstruct
+### config.cfg
 
-4. RUN_AF3_INFERENCE: Step to run AF3 inference on the reconstructed JSON files. It takes a folder containing json files and returns the models for each of the datapoints inside that folder.
-    Section in config file:
-        FOLDERS_INFERENCE (optional):  Space separated list containing the name of the folders within jsonFiles/customJSON that one wants to model. For example, to model the datapoints with unpaired MSA and onQuery template folders inference needs to be set to json_unpairedMSA_onqueryTemplate. If nothing is provided, all the folders in jsonFiles/customJSON are processed.
-        SUFFIX_OUTPUT (optional) : Suffix for the AF3 inference folder. If not provided, suffix is set to ""
-        NUM_SEEDS: Number of seeds to use for inference. If not provided, one seed is used
-        NUM_DIFFUSION: Number of diffusion samples to use for inference. If not provided, five samples are produced.
-    Code: runAF3_inference.sh
-    Inputs (in this order):
-        folder_path: Path to the folder containing the json files to process
-        output_inference: Path to the folder where output will be saved
-        logs_path: Path to the folder where the log files will be saved
-        ARRAY_MAP_INFERENCE: Path to the samplename_to_array.txt produced in the first step
-        NUM_SEEDS: Number of seeds
-        NUM_DIFFUSSION: Number of diffusion samples
-        start: Element from samplename_to_array.txt where we start processing
+Which steps to run and how. `workflow.sh` takes the config path as its first argument (`sbatch workflow.sh configs/your.cfg`, defaults to `configs/config.cfg`). Start from `configs/configMinimal.cfg` (required fields only) or `configs/config.cfg` (all fields, for reference). Fields with a listed default are optional and can be omitted.
 
-5. COMPUTE_DOCKQ : If there are solved structures available, the pipeline allows the user to compute the DockQ between each model and the solved structure, with respect to the TCR and the peptideMHC complex.
-    Section in config file:
-        TEMPLATE_PATH (required): Points to the folder where the solved-structures templates are stored. The templates should be truncated in the same way as the inputs. And stored under the name: {pdb_id}.trunc.fit.pdb, with pdb_id matching the name by which the models are saved.
-    Code: computeDockq.py
-    Inputs:
-        -i : Input folder path containing all the pdb_ids to process. It's the output of the inference step i.e json_unpairedMSA_onqueryTemplate
-        -t : Template path. Matches the TEMPLATE_PATH in the config file
-        -d : Path to the dockQ repo. It needs to be version 1.0
-        -n1 : Name of the chains to evaluate (TCR) in the native structure
-        -m1 : Name of the chains to evaluate (TCR) in the models
-        -n2: Name to the chains to evaluate (pMHC) in the native structure
-        -m2: Name to the chains to evaluate (pMHC) in the model
-        -s: Suffic to append to the file names
-    Ouput: Saves in each pdb_id/sample_seed folder the dockQ output
+**Step selection** (all required — pick `true`/`false` for each):
+- `RUN_JSON_WITH_MSA_TEMPLATE_GENERATION`, `RUN_DATA_GENERATION_PIPELINE`, `RUN_CUSTOM_JSON_GENERATION`, `RUN_AF3_INFERENCE`, `COMPUTE_DOCKQ`, `RUN_METRICS_COLLECTION`.
 
-6. RUN_METRICS_COLLECTION: Collects a set of metrics for model selection and target selection
-    Section in config file:
-        FOLDERS_METRIC_COLLECTION (optional): Folders to collect the metrics for. If not provided, all the folders present in structInference folder are evaluated. If multiple folders should be passed, provide them as a blank space separated string. I.e: "json_pairedMSA_onqueryTemplate json_unpairedMSA_onqueryTemplate"
-        NUM_METRIC_SPLITS (optional): Number of parallel SLURM array tasks to split metrics collection into. This helps to speed up collection if many datapoints are present. By default set to one.
-        CONCURRENT_METRICS (optional): Maximum concurrent tasks from NUM_METRIC_SPLITS. Set according to your resources. By default set to one.
-    Code: collect_af3metrics_extended_parallel.py called via collect_metrics_slurm_parallel.sh + combine_metrics_onefile.py
-    Inputs for collect_metrics_slurm_parallel.sh (in this order):
-        - folder_path: Path to folder containing the inference. structureInference...
-        - suffix: Suffix to append to the metric files
-        NUM_METRIC_SPLITS: Number of splits when computing the metrics
-        metrics_logs: Path to the log where each of the logs for the splits will be saved
+**Slurm array sizing** (optional, default `1` each):
+- `CONCURRENT`: max concurrent array tasks for the data generation step.
+- `CONCURRENT_INFERENCE`: max concurrent array tasks for the inference step.
+- `GLOBAL_START` (default `1`): array index to start submitting from.
 
-    Outpus: The output of this step is a collection of metrics saved within each folder i.e json_unpairedMSA_onqueryTemplate called "collected_af3metrics.csv" containing all the metrics for each datapoint
+**Preprocessing step** (`RUN_JSON_WITH_MSA_TEMPLATE_GENERATION`):
+- `DATA_DIR` (required): base path holding the input CSV; also where all pipeline outputs for this run are written, in subfolders.
+- `INPUT_FILE` (required): path to the input CSV, relative to `DATA_DIR`.
+- `SUFFIX_DATAGEN` (optional, default none): suffix appended to the data-generation output folder — useful when running multiple settings (e.g. different databases) for the same input.
 
-    Inputs for collect_af3metrics_extended_parallel.py:
-    -i: Path to the specific folder to evaluate i.e json_unpairedMSA_onqueryTemplate
-    -s: Suffic to append to the metric files
-    --split_idx: Specific split we are processing
-    --num_splits: Total number of splits
-    Note: DockQ is picked up automatically if present on disk (dockQ_metrics_*.json files next to each model), independently of the -s suffix. This means COMPUTE_DOCKQ and RUN_METRICS_COLLECTION can be run in either order/separately: as long as DockQ has been computed at some point for a folder, the dockq column will be populated when metrics are collected for it, even if this particular run has COMPUTE_DOCKQ=false. It will only be empty if no DockQ has been computed yet for that folder.
-    Inputs for combine_metrics_onefile.py: Use this code if multiple folders were processed and output should be collapsed into a single file.
-        -i: General folder where inference samples are stored i.e: structureInference
-        -s: Suffix to append to the file
-    Output: A file in the structureInference folder called allresults_merged.csv containing the metrics for all parameter combinations.
+**AF3 data generation step** (`RUN_DATA_GENERATION_PIPELINE`):
+- `TEMPLATE_SELECTION_METHOD` (optional, default `onquery`): space-separated list of `onquery`/`standard` methods to run.
 
-    Code: expandMetrics.py. Run after combine_metrics_onefile.py on its output. The per-datapoint metrics are stored as nested per-chain-pair dictionaries (e.g. chain_pair_iptm, chain_pair_pae_min, cdr_metric_mean_chain, ipsae, ipsae_d0chn, ipsae_d0dom); this step flattens them into one column per chain pair (e.g. TRA_TRB_ipsae) so the results can be filtered/plotted without parsing dictionaries.
-    Inputs for expandMetrics.py:
-        -i/--input_csv: Path to the combined metrics file to expand. In the pipeline this is allresults_merged{suffix}.csv, produced by combine_metrics_onefile.py
-        -o/--output_csv: Path to save the expanded csv
-    Output: A file in the structureInference folder called allresults_merged_expanded.csv, with the chain-pair metrics expanded into individual columns instead of nested dictionaries.
+**Custom JSON generation step** (`RUN_CUSTOM_JSON_GENERATION`):
+- `MSA_TEMPLATE_COMBINATIONS` (optional, default `unpaired_onquery`): space-separated `<msaMode>_<templateMode>` combinations to reconstruct. `msaMode`: `unpaired`/`paired`/`full`/`no`. `templateMode`: `onquery`/`standard`/`no`.
 
+**AF3 structure inference step** (`RUN_AF3_INFERENCE`):
+- `FOLDERS_INFERENCE` (optional, default: all folders under `jsonFiles/customJSON`): space-separated folder names to run inference on.
+- `SUFFIX_OUTPUT` (optional, default none): suffix appended to the inference output folder.
+- `NUM_SEEDS` (optional, default `1`): number of seeds per datapoint.
+- `NUM_DIFFUSION` (optional, default `5`): number of diffusion samples per seed.
 
+**DockQ computation** (`COMPUTE_DOCKQ`):
+- `TEMPLATE_PATH` (required if `COMPUTE_DOCKQ=true`): folder of solved-structure templates, truncated the same way as the inputs, named `{pdb_id}.trunc.fit.pdb` matching each model's `pdb_id`.
+
+**Metrics collection** (`RUN_METRICS_COLLECTION`):
+- `FOLDERS_METRIC_COLLECTION` (optional, default: all folders under the inference output): space-separated folder names to collect metrics for.
+- `NUM_METRIC_SPLITS` (optional, default `1`): number of parallel SLURM array tasks to split metrics collection into.
+- `CONCURRENT_METRICS` (optional, default `1`): max concurrent tasks from `NUM_METRIC_SPLITS`.
+
+## Advanced: scripts reference
+
+Each pipeline step is backed by one or more standalone scripts, in case you want to call them directly instead of going through `workflow.sh`.
+
+**1. Data preprocessing** — `NetTCRfold.jsonPrep.dataPreprocessing`
+- `-i`: input CSV (see [input data format](#preparing-your-own-input-data)).
+- `-o`: output folder.
+- `-m`: MHC database, used to infer allele sequences when `MHCA_aa` isn't given.
+- Outputs: `{input_file}_hla_withid.csv` (input + assigned HLA + unique chain IDs); `chainid_to_array.txt` and `samplename_to_array.txt` (SLURM array index maps); `jsonFiles/json_msa_template/` (one folder per unique chain, AF3-format input).
+
+**2. Data generation** — `runAF3_dataGeneration.sh` (positional args): `config` (`chainid_to_array.txt`), `json_path` (`json_msa_template/`), `output_dir`, `logs_path`, `template_selection_method`, `start_id`.
+
+**3. Custom JSON generation** — `NetTCRfold.jsonPrep.create_custom_json`
+- `-i`: data-generation output folder (`dataPipelineOut{suffix}`).
+- `-o`: output folder for reconstructed JSON (`jsonFiles/customJSON`).
+- `-d`: path to `{input_file}_hla_withid.csv` from step 1.
+- `-c`: combinations string to reconstruct.
+
+**4. AF3 inference** — `runAF3_inference.sh` (positional args): `folder_path` (JSON files to process), `output_inference`, `logs_path`, `ARRAY_MAP_INFERENCE` (`samplename_to_array.txt`), `NUM_SEEDS`, `NUM_DIFFUSION`, `start`.
+
+**5. DockQ** — `NetTCRfold.metrics.computeDockq`
+- `-i`: folder of `pdb_id`s to process (inference output).
+- `-t`: template path (solved structures).
+- `-d`: path to the DockQ v1.0 repo.
+- `-n1`/`-m1`: TCR chain names in the native/model structure.
+- `-n2`/`-m2`: pMHC chain names in the native/model structure.
+- `-s`: suffix appended to output filenames.
+- Output: writes DockQ results into each `pdb_id`/`sample_seed` folder.
+
+**6. Metrics collection** — three scripts run in sequence:
+- `NetTCRfold.metrics.collect_af3metrics_extended_parallel` (called via `collect_metrics_slurm_parallel.sh`): `-i` folder to evaluate, `-s` suffix, `--split_idx`/`--num_splits` for parallel splitting. DockQ is picked up automatically from `dockQ_metrics_*.json` files found on disk, independent of `-s` — so this works whether or not DockQ was computed in the same run. Output: `collected_af3metrics{suffix}.csv` per folder.
+- `NetTCRfold.metrics.combine_metrics_onefile`: `-i` the general inference output folder, `-s` suffix. Output: `allresults_merged{suffix}.csv`, combining all folders.
+- `NetTCRfold.metrics.expandMetrics`: `-i`/`--input_csv` the `allresults_merged{suffix}.csv` above, `-o`/`--output_csv` output path. Flattens the nested per-chain-pair metric dictionaries (`chain_pair_iptm`, `chain_pair_pae_min`, `cdr_metric_mean_chain`, `ipsae`, `ipsae_d0chn`, `ipsae_d0dom`) into one column per chain pair (e.g. `TRA_TRB_ipsae`). Output: `allresults_merged_expanded{suffix}.csv`.

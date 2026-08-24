@@ -1,0 +1,4 @@
+pipeline/logs
+pipeline/scripts/__pycache__/
+pipeline/scripts/__pycache__/*
+README_legacy.md

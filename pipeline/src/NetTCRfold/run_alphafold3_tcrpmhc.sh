@@ -1,6 +1,6 @@
 #! /bin/bash
-# AF3_RESOURCES_DIR must be set in the environment (see configs/env.cfg.example)
-: "${AF3_RESOURCES_DIR:?AF3_RESOURCES_DIR is not set — define it in configs/env.cfg (see configs/env.cfg.example)}"
+# AF3_RESOURCES_DIR must be set in the environment (see configs/envExample.cfg)
+: "${AF3_RESOURCES_DIR:?AF3_RESOURCES_DIR is not set — define it in configs/env.cfg (see configs/envExample.cfg)}"
 export AF3_SRC=${AF3_RESOURCES_DIR}
 export AF3_IMAGE=${AF3_IMAGE}
 export AF3_MODEL_PARAMETERS_DIR=${AF3_RESOURCES_DIR}/weights

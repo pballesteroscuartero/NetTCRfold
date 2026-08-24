@@ -11,16 +11,27 @@
 #Strict execution mode
 set -Eeuo pipefail
 
-#Machine/install-specific paths — see configs/env.cfg.example
+#Machine/install-specific paths — see configs/envExample.cfg
 source configs/env.cfg
 source "$CONDA_SH"
 conda activate NetTCRfold
 
-source configs/config.cfg
+#Path to the run's config.cfg, passed as the first argument (e.g.
+#`sbatch workflow.sh configs/configMinimal.cfg`). Defaults to configs/config.cfg.
+CONFIG_FILE="${1:-configs/config.cfg}"
+source "$CONFIG_FILE"
 
 src=$PROJECT_ROOT
 mhcdb=$src/databases/mhc_sequences
 dockq_repo=$DOCKQ_REPO
+
+#Slurm array concurrency (override in config if needed)
+CONCURRENT="${CONCURRENT:-1}"
+CONCURRENT_INFERENCE="${CONCURRENT_INFERENCE:-1}"
+
+#AF3 inference sizing (override in config if needed)
+NUM_SEEDS="${NUM_SEEDS:-1}"
+NUM_DIFFUSION="${NUM_DIFFUSION:-5}"
 
 #Metrics collection array-job sizing (override in config if needed)
 NUM_METRIC_SPLITS="${NUM_METRIC_SPLITS:-1}"

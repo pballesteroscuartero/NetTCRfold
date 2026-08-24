@@ -34,8 +34,9 @@ git clone git@github.com:wallnerlab/DockQ.git
 (cd DockQ && git checkout 3735c16)
 
 echo "== Step 7: Conda environment =="
+# NetTCRfold.yml's pip section already ends in "-e .", so env creation
+# installs the package editable — no separate pip install step needed.
 conda env create -f "$SCRIPT_DIR/pipeline/NetTCRfold.yml"
-conda run -n NetTCRfold pip install -e "$SCRIPT_DIR/pipeline"
 
 echo
 echo "Installation finished. Activate the environment with: conda activate NetTCRfold"
