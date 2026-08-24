@@ -87,7 +87,7 @@ def expand_chain_pair_metrics_gen(df):
             df.at[idx, col_name] = val
 
         metrics = ["cdr_metric_mean_chain",
-                   "ipsae", "ipsae_d0chn", "ipsae_d0dom"]
+                   "ipsae", "ipsae_d0chn", "ipsae_d0dom", "is_interface"]
 
         extract_dictionary_into_df(df, row, idx, metrics, dict_key_map, mode_flatten="offdiag")
     
@@ -102,9 +102,9 @@ def main():
         .apply(expand_chain_pair_metrics_gen)
     )
     expanded_df = expanded_df.drop(columns = ["chain_iptm", "chain_ptm", "chain_pair_iptm",
-                                               "chain_pair_pae_min", 
+                                               "chain_pair_pae_min",
                                                "cdr_metric_mean_chain",
-                                               "ipsae", "ipsae_d0chn", "ipsae_d0dom",
+                                               "ipsae", "ipsae_d0chn", "ipsae_d0dom", "is_interface",
                                                 "chain_names"])
     expanded_df = expanded_df.drop(columns=[col for col in expanded_df.columns if "MHCB" in col])
     expanded_df.to_csv(args.output_csv, index=False)

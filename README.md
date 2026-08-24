@@ -47,6 +47,8 @@ This runs JSON generation, MSA/template generation with the default parameters a
 pipeline/examples/data_minimal/af3_output/structInference/allresults_merged_expanded.csv
 ```
 
+There is also an example with 10 datapoints under: `pipeline/examples/data_10examples/benchmark_10examples.csv`) 
+
 ## Pipeline overview
 
 `workflow.sh` runs up to six steps in order, each one turned on/off in `config.cfg`:

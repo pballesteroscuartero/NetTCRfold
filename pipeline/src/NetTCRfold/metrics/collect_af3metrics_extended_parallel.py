@@ -130,7 +130,7 @@ def process_complex(args):
             "iptm": float(afsumm["iptm"]),
             "ptm": float(afsumm["ptm"]),
             "mean_plddt": float(pd.Series(af["atom_plddts"]).mean()),
-            "is_interface": df_interface.to_dict(),
+            "is_interface": df_interface.to_dict(orient="index"),
             "plddt_cdrpep": plddt_cdrpep,
             "dockq":dockq,
             "cdr_metric_mean_chain": df_cdr_metric_mean.to_dict(),
