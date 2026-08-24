@@ -2,3 +2,4 @@ pipeline/logs
 pipeline/scripts/__pycache__/
 pipeline/scripts/__pycache__/*
 README_legacy.md
+alphafold3_tcrpmhc/src/alphafold3/constants/
