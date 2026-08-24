@@ -25,7 +25,7 @@ from NetTCRfold.metrics.ipsae_function import compute_ipsae
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--input", type=Path, required=True)
-    parser.add_argument("-s", "--suffix", type=Path, required=True)
+    parser.add_argument("-s", "--suffix", required=True)
     parser.add_argument(
         "--split_idx",
         type=int,
@@ -73,8 +73,7 @@ def process_complex(args):
                 dockq = d["DockQ"]
         else:
             print(f"File {dockq_path} does not exist.")
-
-        dockq = None 
+            dockq = None 
 
         with open(model_summary_confidences_path) as f:
             afsumm = json.load(f)
@@ -102,7 +101,7 @@ def process_complex(args):
             cdrs_cache = extract_cdrs_from_structure(structure_noh)
             
         df_interface = is_interface(structure_noh)
-        plddt_cdrpep, _ = get_plddt_score(structure_noh, plddt_scores=af_arrays["atom_plddts"]) #Corrected with the way of extracting CDRs
+        plddt_cdrpep = get_plddt_score(structure_noh, plddt_scores=af_arrays["atom_plddts"]) #Corrected with the way of extracting CDRs
         df_cdr_metric_mean = pae_metrics_perchain_pair(structure_noh, af_arrays, cdrs = cdrs_cache)
         metric_dict_ipsae = parse_ipsae(df_ipsae)
         rows.append({
