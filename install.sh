@@ -23,7 +23,13 @@ echo "== Step 5: Curated databases =="
 wget -r -np -nH --cut-dirs=3 -R "index.html*" -P alphafold3_tcrpmhc/ \
     https://services.healthtech.dtu.dk/suppl/immunology/NetTCRaFold-1.0/tcrpmhc_databases/
 
-echo "== Step 6: Conda environment =="
+echo "== Step 6: DockQ =="
+
+git clone git@github.com:wallnerlab/DockQ.git
+cd DockQ
+git checkout 3735c16
+
+echo "== Step 7: Conda environment =="
 conda env create -f pipeline/NetTCRfold.yml
 conda activate NetTCRfold
 conda run -n NetTCRfold pip install -e "$SCRIPT_DIR/pipeline"

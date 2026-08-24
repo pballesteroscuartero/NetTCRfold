@@ -32,7 +32,14 @@ wget -r -np -nH --cut-dirs=3 -R "index.html*" -P alphafold3_tcrpmhc/ \
 
 ```
 
-6. Install the environment for running the pipeline:
+6. Install DockQ and get version 1.0
+
+```
+git clone git@github.com:wallnerlab/DockQ.git
+cd DockQ
+git checkout 3735c16
+```
+7. Install the environment for running the pipeline:
 
 ```
 conda env create -f pipeline/NetTCRfold.yml
