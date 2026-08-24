@@ -31,7 +31,7 @@ CONCURRENT_METRICS="${CONCURRENT_METRICS:-1}"
 GLOBAL_START="${GLOBAL_START:-1}"
 
 #Detects the largest ArrayTaskID in a tab-separated *_to_array.txt file
-#(see structureTCR.jsonPrep.dataPreprocessing)
+#(see NetTCRfold.jsonPrep.dataPreprocessing)
 max_array_task_id() {
     local file="$1"
     if [[ ! -s "$file" ]]; then

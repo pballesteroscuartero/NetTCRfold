@@ -26,7 +26,7 @@ logs_path=$4
 mkdir -p "$logs_path"
 exec >"${logs_path}/split${SLURM_ARRAY_TASK_ID}.out" 2>"${logs_path}/split${SLURM_ARRAY_TASK_ID}.err"
 
-python -m structureTCR.metrics.collect_af3metrics_extended_parallel \
+python -m NetTCRfold.metrics.collect_af3metrics_extended_parallel \
     -i "$folder_path" \
     -s "$suffix" \
     --split_idx "$SLURM_ARRAY_TASK_ID" \

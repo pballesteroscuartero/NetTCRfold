@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import biotite.structure as struct
-from structureTCR.metrics.structure_utils import extract_cdrs_from_structure, get_interface_atoms
+from NetTCRfold.metrics.structure_utils import extract_cdrs_from_structure, get_interface_atoms
 
 def is_interface(structure):
     """
