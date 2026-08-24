@@ -7,7 +7,6 @@
 #SBATCH --time=250:00:00
 #SBATCH --output=logs/slurm_%A_%a.out
 #SBATCH --error=logs/slurm_%A_%a.err
-#--nodelist=compute02,compute03,compute04,compute05,compute06
 
 #Strict execution mode
 set -Eeuo pipefail
@@ -15,7 +14,7 @@ set -Eeuo pipefail
 #Machine/install-specific paths — see configs/env.cfg.example
 source configs/env.cfg
 source "$CONDA_SH"
-conda activate structureTCR
+conda activate NetTCRfold
 
 source configs/config.cfg
 
@@ -31,7 +30,6 @@ CONCURRENT_METRICS="${CONCURRENT_METRICS:-1}"
 GLOBAL_START="${GLOBAL_START:-1}"
 
 #Detects the largest ArrayTaskID in a tab-separated *_to_array.txt file
-#(see NetTCRfold.jsonPrep.dataPreprocessing)
 max_array_task_id() {
     local file="$1"
     if [[ ! -s "$file" ]]; then
@@ -68,13 +66,6 @@ logs_path="${logs_path%/*}"
 logs_path="${logs_path%/*}/logs/"
 
 mkdir -p "${logs_path}/"
-
-##Old behaviour: data-generation/inference redirected logs also lived two levels up from
-##DATA_DIR (sibling of the "examples" folder, same place as metrics/the top-level exec below).
-##Kept here for reference/rollback.
-#logs_path_datageneration="${logs_path}/af3_datageneration_workflow${suffix_output_datagen}/"
-#logs_path_inference="${logs_path}/af3_inference${suffix_output_inference}/"
-
 
 logs_path_datageneration="${logs_path_inside}/af3_datageneration_workflow${suffix_output_datagen}/"
 logs_path_inference="${logs_path_inside}/af3_inference${suffix_output_inference}/"
@@ -230,7 +221,6 @@ if $COMPUTE_DOCKQ; then
             -m2 C A \
             -s "_dockQonpMHC"
         echo "Computation for $folder finished."
-        echo "Removing extra pdb files generated"
         find "$folder_path" -mindepth 3 -maxdepth 3 -type f -name "*.pdb" -delete
     done
     echo "DockQ collected for all folders"
@@ -264,9 +254,9 @@ if $RUN_METRICS_COLLECTION; then
         echo "Collecting metrics for files in $folder"
         for i in "${!suffixes[@]}"; do
             suffix="${suffixes[$i]}"
-            metrics_logs="${logs_path}/af3_metrics${suffix_output_inference}/${folder}${suffix}"
+            metrics_logs="${logs_path_inside}/af3_metrics${suffix_output_inference}/${folder}${suffix}"
             mkdir -p "$metrics_logs"
-            metrics_logs_slurm="${logs_path_slurm}/af3_metrics${suffix_output_inference}/${folder}${suffix}"
+            metrics_logs_slurm="${logs_path}/af3_metrics${suffix_output_inference}/${folder}${suffix}"
             mkdir -p "$metrics_logs_slurm"
 
             echo "Submitting metrics collection array job for $folder (suffix=$suffix): $NUM_METRIC_SPLITS splits, %${CONCURRENT_METRICS} concurrent"

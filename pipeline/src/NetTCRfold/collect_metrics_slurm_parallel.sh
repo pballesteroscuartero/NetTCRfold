@@ -16,7 +16,7 @@ set -Eeuo pipefail
 
 : "${CONDA_SH:?CONDA_SH is not set — define it in configs/env.cfg (see configs/env.cfg.example)}"
 source "$CONDA_SH"
-conda activate structureTCR
+conda activate NetTCRfold
 
 folder_path=$1
 suffix=$2

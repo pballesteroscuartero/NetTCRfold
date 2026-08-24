@@ -142,8 +142,8 @@ def get_plddt_score(
     mask_cdr = np.isin(structure.atom_id, cdr_struct.atom_id)
     mask_atoms_pep = np.isin(structure.atom_id, pep_struct.atom_id)
     plddt_cdr_pep = np.concatenate([plddt_scores[mask_cdr], plddt_scores[mask_atoms_pep]])
-    plddt_mean = np.mean(plddt_cdr_pep) * 0.01
-    return plddt_mean
+    plddt_mean_cdr_pep = np.mean(plddt_cdr_pep) * 0.01
+    return plddt_mean_cdr_pep
 
 
 def parse_ipsae(df, metrics=None, type_filter="asym"):

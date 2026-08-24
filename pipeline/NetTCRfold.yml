@@ -1,4 +1,4 @@
-name: structureTCR
+name: NetTCRfold
 channels:
   - defaults
   - bioconda
