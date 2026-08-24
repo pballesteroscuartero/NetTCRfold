@@ -41,6 +41,7 @@ git clone git@github.com:wallnerlab/DockQ.git
 cd DockQ
 git checkout 3735c16
 ```
+
 7. Install the environment for running the pipeline:
 
 ```
