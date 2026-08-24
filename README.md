@@ -3,11 +3,13 @@
 1. Clone the repository: 
 
 ```
-git clone git@github.com:pballesteroscuartero/NetTCRstruc2.git
-cd NetTCRstruc2
+git clone git@github.com:pballesteroscuartero/NetTCRfold.git
+cd NetTCRfold
 ```
 
 2. Request access to AF3 weights from XXXX and place them inside alphafold3_tcrpmhc folder
+
+--- Run bash install.sh to automatically run the following steps:
 
 3. Download the image for running the modified AF3 pipeline from https://services.healthtech.dtu.dk/suppl/immunology/NetTCRaFold-1.0/image link
 
@@ -46,8 +48,8 @@ conda env create -f pipeline/NetTCRfold.yml
 conda activate NetTCRfold
 pip install -e .
 ```
+--- 
 
-##NOTE: DockQ version 1 is provided. It is cloned from the original repository: https://github.com/wallnerlab/DockQ/tree/v1.0 
 
 
 ##TODO. Add somewhere the errors: Make sure to download apptainer - otherwise the following error will be seen when running data processing or inference in the examples/logs/af3_datageneration_workflow/*.err: FATAL:   While checking container encryption: could not open image /imagePath/alphafold3_tcrpmhc_cuda126-py312.sif: failed to retrieve path for /imagePath/alphafold3_tcrpmhc_cuda126-py312.sif: lstat /imagePath/alphafold3_tcrpmhc_cuda126-py312.sif: no such file or directory 
