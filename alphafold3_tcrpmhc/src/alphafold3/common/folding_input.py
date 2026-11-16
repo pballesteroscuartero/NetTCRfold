@@ -31,6 +31,7 @@ from alphafold3.cpp import cif_dict
 from alphafold3.structure import mmcif as mmcif_lib
 import rdkit.Chem as rd_chem
 import zstandard as zstd
+from etils import epath
 
 
 BondAtomId: TypeAlias = tuple[str, int, str]
@@ -805,6 +806,8 @@ class Ligand:
   ccd_ids: Sequence[str] | None = None
   smiles: str | None = None
   description: str | None = None
+  conformer_restraints: bool = False
+
 
   def __post_init__(self):
     if (self.ccd_ids is None) == (self.smiles is None):
@@ -850,7 +853,7 @@ class Ligand:
     """Constructs Ligand from the AlphaFold JSON dict."""
     json_dict = json_dict['ligand']
     _validate_keys(
-        json_dict.keys(), {'id', 'ccdCodes', 'smiles', 'description'}
+        json_dict.keys(), {'id', 'ccdCodes', 'smiles', 'description', 'conformer_restraints'}
     )
     if json_dict.get('ccdCodes') and json_dict.get('smiles'):
       raise ValueError(
@@ -858,6 +861,7 @@ class Ligand:
           f'got CCD: {json_dict["ccdCodes"]} and SMILES: {json_dict["smiles"]}'
       )
 
+    conformer_restraints = bool(json_dict.get('conformer_restraints', False))
     if 'ccdCodes' in json_dict:
       ccd_codes = json_dict['ccdCodes']
       if not isinstance(ccd_codes, (list, tuple)):
@@ -869,15 +873,19 @@ class Ligand:
           id=seq_id or json_dict['id'],
           ccd_ids=ccd_codes,
           description=json_dict.get('description', None),
+          conformer_restraints=conformer_restraints,
       )
     elif 'smiles' in json_dict:
       return cls(
           id=seq_id or json_dict['id'],
           smiles=json_dict['smiles'],
           description=json_dict.get('description', None),
+          conformer_restraints=conformer_restraints
       )
     else:
       raise ValueError(f'Unknown ligand type: {json_dict}')
+    
+
 
   def to_dict(
       self, seq_id: str | Sequence[str] | None = None
@@ -890,6 +898,8 @@ class Ligand:
       contents['smiles'] = self.smiles
     if self.description is not None:
       contents['description'] = self.description
+    if self.conformer_restraints:
+      contents['conformer_restraints'] = True
     return {'ligand': contents}
 
 
@@ -957,6 +967,7 @@ class Input:
   rng_seeds: Sequence[int]
   bonded_atom_pairs: Sequence[tuple[BondAtomId, BondAtomId]] | None = None
   user_ccd: str | None = None
+  restraints_config: dict | None = None
 
   def __post_init__(self):
     if not self.rng_seeds:
@@ -1117,6 +1128,7 @@ class Input:
             'bondedAtomPairs',
             'userCCD',
             'userCCDPath',
+            'restraints_config',
         },
     )
 
@@ -1242,12 +1254,22 @@ class Input:
     elif user_ccd_path:
       user_ccd = _read_file(pathlib.Path(user_ccd_path), json_path)
 
+    restraints_config = raw_json.get('restraints_config')
+    if restraints_config is not None:
+      from rgi_toolkit.config import resolve_restraints_config
+
+      restraints_config = resolve_restraints_config(
+          restraints_config,
+          base_dir=epath.Path(json_path).parent if json_path is not None else None,
+      )
+
     return cls(
         name=raw_json['name'],
         chains=chains,
         rng_seeds=[int(seed) for seed in raw_json['modelSeeds']],
         bonded_atom_pairs=bonded_atom_pairs,
         user_ccd=user_ccd,
+        restraints_config=restraints_config,
     )
 
   @classmethod
@@ -1446,18 +1468,21 @@ class Input:
       chain = deduped_chains[chain_content_hash]
       sequences.append(chain.to_dict(seq_id=ids if len(ids) > 1 else ids[0]))
 
-    alphafold_json = json.dumps(
-        {
-            'dialect': JSON_DIALECT,
-            'version': JSON_VERSION,
-            'name': self.name,
-            'sequences': sequences,
-            'modelSeeds': self.rng_seeds,
-            'bondedAtomPairs': self.bonded_atom_pairs,
-            'userCCD': self.user_ccd,
-        },
-        indent=2,
-    )
+    json_obj = {
+    'dialect': JSON_DIALECT,
+    'version': JSON_VERSION,
+    'name': self.name,
+    'sequences': sequences,
+    'modelSeeds': self.rng_seeds,
+    'bondedAtomPairs': self.bonded_atom_pairs,
+    'userCCD': self.user_ccd,
+    }
+
+    if self.restraints_config is not None:
+      json_obj['restraints_config'] = self.restraints_config
+
+    alphafold_json = json.dumps(json_obj, indent=2)
+
     # Remove newlines from the query/template indices arrays. We match the
     # queryIndices/templatesIndices with a non-capturing group. We then match
     # the entire region between the square brackets by looking for lines

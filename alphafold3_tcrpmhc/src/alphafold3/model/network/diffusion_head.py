@@ -299,6 +299,7 @@ def sample(
     batch: feat_batch.Batch,
     key: jnp.ndarray,
     config: SampleConfig,
+    restraints=None,
 ) -> dict[str, jnp.ndarray]:
   """Sample using denoiser on batch.
 
@@ -308,6 +309,7 @@ def sample(
     key: random key
     config: config for the sampling process (e.g. number of denoising steps,
       etc.)
+    restraints: optional restraints to apply during sampling
 
   Returns:
     a dict
@@ -321,7 +323,8 @@ def sample(
 
   mask = batch.predicted_structure_info.atom_mask
 
-  def apply_denoising_step(carry, noise_level):
+  def apply_denoising_step(carry, scan_x):
+    noise_level, istep = scan_x
     key, positions, noise_level_prev = carry
     key, key_noise, key_aug = jax.random.split(key, 3)
 
@@ -337,6 +340,10 @@ def sample(
     positions_noisy = positions + noise
 
     positions_denoised = denoising_step(positions_noisy, t_hat)
+    if restraints is not None:
+      positions_denoised = restraints.minimize_gpu(
+          positions_denoised, noise_level_prev, istep
+    )
     grad = (positions_noisy - positions_denoised) / t_hat
 
     d_t = noise_level - t_hat
@@ -361,7 +368,13 @@ def sample(
   apply_denoising_step = hk.vmap(
       apply_denoising_step, in_axes=(0, None), split_rng=(not hk.running_init())
   )
-  result, _ = hk.scan(apply_denoising_step, init, noise_levels[1:], unroll=4)
+  #result, _ = hk.scan(apply_denoising_step, init, noise_levels[1:], unroll=4)
+  result, _ = hk.scan(
+      apply_denoising_step,
+      init,
+      (noise_levels[1:], jnp.arange(config.steps)),
+      unroll=4,
+  )
   _, positions_out, _ = result
 
   final_dense_atom_mask = jnp.tile(mask[None], (num_samples, 1, 1))

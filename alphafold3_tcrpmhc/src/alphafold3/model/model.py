@@ -241,6 +241,7 @@ class Model(hk.Module):
       embeddings: dict[str, jnp.ndarray],
       *,
       sample_config: diffusion_head.SampleConfig,
+      restraints=None,
   ) -> dict[str, jnp.ndarray]:
     denoising_step = functools.partial(
         self.diffusion_module,
@@ -254,12 +255,16 @@ class Model(hk.Module):
         batch=batch,
         key=hk.next_rng_key(),
         config=sample_config,
+        restraints=restraints,
     )
     return sample
 
   def __call__(
-      self, batch: features.BatchDict, key: jax.Array | None = None
-  ) -> ModelResult:
+      self,
+      batch: features.BatchDict,
+      key: jax.Array | None = None,
+      restraints=None,
+    ) -> ModelResult:
     if key is None:
       key = hk.next_rng_key()
 
@@ -306,10 +311,14 @@ class Model(hk.Module):
       num_iter = self.config.num_recycles + 1
       embeddings, _ = hk.fori_loop(0, num_iter, recycle_body, (embeddings, key))
 
+    active_restraints = (
+        restraints if (restraints is not None and restraints.is_active()) else None
+    )
     samples = self._sample_diffusion(
         batch,
         embeddings,
         sample_config=self.config.heads.diffusion.eval,
+        restraints=active_restraints
     )
 
     # Compute dist_error_fn over all samples for distance error logging.
